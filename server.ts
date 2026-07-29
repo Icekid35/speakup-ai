@@ -1537,15 +1537,22 @@ Return JSON strictly:
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
+      if (req.path.startsWith('/api')) {
+        return res.status(404).json({ error: `API route ${req.path} not found` });
+      }
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server listening on http://0.0.0.0:${PORT} (LiteRT-LM Gemma 4 E2B integration active)`);
-  });
+  if (!process.env.VERCEL) {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server listening on http://0.0.0.0:${PORT} (LiteRT-LM Gemma 4 E2B integration active)`);
+    });
+  }
 }
 
 startServer();
+export default app;
+export { app };
 
 

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, RefreshCw, Upload, Video, Wand2, Volume2, Sparkles, CheckCircle2, ShieldAlert, Radio } from 'lucide-react';
+import { Play, Pause, RefreshCw, Upload, Video, Wand2, Volume2, Sparkles, CheckCircle2, ShieldAlert, Radio, ChevronDown } from 'lucide-react';
 import { SpeakUpAnalysis, Segment } from '../types';
 import { ProblemSpotlight } from './AROverlay';
 import { Timeline } from './Timeline';
@@ -255,12 +255,14 @@ export const VideoStage: React.FC<VideoStageProps> = ({
           <div
             className={`relative rounded-3xl overflow-hidden group flex items-center justify-center transition-all mx-auto ${
               !videoUrl && !isRecording 
-                ? 'aspect-video w-full bg-white border border-slate-200 shadow-md shadow-slate-200/50 p-6 sm:p-10 text-center' 
+                ? 'w-full bg-white border border-slate-200 shadow-md shadow-slate-200/50 p-6 sm:p-10 text-center min-h-[260px] sm:aspect-video' 
                 : 'w-full bg-slate-950 border border-slate-800 shadow-2xl p-0'
-            } ${!videoAspectRatio ? 'aspect-video' : ''}`}
+            } ${!videoAspectRatio && (videoUrl || isRecording) ? 'aspect-video' : ''}`}
             style={{
               aspectRatio: (videoUrl || isRecording) && videoAspectRatio ? `${videoAspectRatio}` : undefined,
-              maxHeight: (videoUrl || isRecording) && videoAspectRatio && videoAspectRatio < 1 ? '70vh' : undefined,
+              maxHeight: (videoUrl || isRecording)
+                ? (videoAspectRatio && videoAspectRatio < 1 ? '55vh' : '70vh')
+                : undefined,
             }}
           >
 
@@ -285,8 +287,8 @@ export const VideoStage: React.FC<VideoStageProps> = ({
             {/* Landing / Idle State - Fills Full Container Directly */}
             {!videoUrl && !isRecording && (
               <div className="flex flex-col items-center justify-center space-y-5 max-w-md w-full my-auto">
-                <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
-                  <Video className="w-8 h-8" />
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
+                  <Video className="w-7 h-7 sm:w-8 sm:h-8" />
                 </div>
 
                 <div className="space-y-1.5 px-4">
@@ -353,6 +355,14 @@ export const VideoStage: React.FC<VideoStageProps> = ({
               </div>
             )}
           </div>
+
+          {/* Mobile Scroll Hint */}
+          {!videoUrl && !isRecording && (
+            <div className="flex sm:hidden items-center justify-center gap-1 text-[11px] text-slate-400 font-mono">
+              <span>Scroll down for AI tools</span>
+              <ChevronDown className="w-3.5 h-3.5 text-indigo-500 animate-bounce" />
+            </div>
+          )}
 
           {/* Timeline */}
           {analysis && videoUrl && (
