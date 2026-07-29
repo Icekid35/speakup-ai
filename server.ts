@@ -6,11 +6,34 @@ import { exec } from "child_process";
 import { promisify } from "util";
 const execAsync = promisify(exec);
 
+import fs from "fs";
+
 const app = express();
 const PORT = 3000;
 
 app.use(express.json({ limit: "200mb" }));
 app.use(express.urlencoded({ limit: "200mb", extended: true }));
+
+/**
+ * Helper to parse .env file natively without third-party module dependency
+ */
+function loadEnvFile() {
+  const envPath = path.resolve(process.cwd(), ".env");
+  if (fs.existsSync(envPath)) {
+    const content = fs.readFileSync(envPath, "utf-8");
+    content.split("\n").forEach((line) => {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith("#") && trimmed.includes("=")) {
+        const [key, ...valueParts] = trimmed.split("=");
+        const value = valueParts.join("=").trim().replace(/^["']|["']$/g, "");
+        if (key && value) {
+          process.env[key.trim()] = value;
+        }
+      }
+    });
+  }
+}
+loadEnvFile();
 
 const LITERT_SERVER_URL = process.env.LITERT_SERVER_URL || "http://127.0.0.1:9379";
 const MODEL_NAME = "gemma-4-e2b";
@@ -198,7 +221,6 @@ function cleanAndParseJSON<T = any>(text: string, fallback?: T): T {
 }
 
 import { execSync, spawnSync } from "child_process";
-import fs from "fs";
 
 const EDGE_TTS_BIN = path.join(process.cwd(), ".venv/bin/edge-tts");
 const FFMPEG_BIN = "/opt/homebrew/bin/ffmpeg";
@@ -907,11 +929,18 @@ Return ONLY valid JSON with this exact structure:
 
   // Application Mode & Config Endpoint
   app.get("/api/config", (req, res) => {
+    loadEnvFile();
     const appMode = (process.env.APP_MODE || "local").toLowerCase();
+    const envApiKey = process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim() !== "PLACEHOLDER_API_KEY" ? process.env.GEMINI_API_KEY.trim() : null;
+    const envModel = process.env.GEMINI_MODEL ? process.env.GEMINI_MODEL.trim() : null;
+
     res.json({
       appMode, // 'local' | 'production'
       isProduction: appMode === "production",
-      defaultModel: appMode === "production" ? null : "gemma-4-e2b"
+      defaultModel: appMode === "production" ? (envModel || null) : "gemma-4-e2b",
+      hasEnvApiKey: !!envApiKey,
+      envApiKey: envApiKey || null,
+      envModel: envModel || null
     });
   });
 
@@ -948,13 +977,14 @@ Return ONLY valid JSON with this exact structure:
       }
 
       // Cloud Model Validation via real ping request to Google Gemini API
-      if (!apiKey || !apiKey.trim()) {
+      const effectiveKey = (apiKey && apiKey.trim()) || process.env.GEMINI_API_KEY;
+      if (!effectiveKey || !effectiveKey.trim()) {
         return res.status(400).json({ valid: false, error: "API key is required for cloud models." });
       }
 
-      const ai = new GoogleGenAI({ apiKey: apiKey.trim() });
+      const ai = new GoogleGenAI({ apiKey: effectiveKey.trim() });
       const response = await ai.models.generateContent({
-        model: model || "gemma-4-31b-it",
+        model: model || process.env.GEMINI_MODEL || "gemma-4-31b-it",
         contents: "hi",
       });
 

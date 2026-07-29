@@ -33,15 +33,15 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
           const mode = data.appMode || 'local';
           setAppMode(mode);
 
-          const storedKey = localStorage.getItem('speakup_gemini_api_key') || localStorage.getItem('aura_gemini_api_key') || '';
-          const storedModel = localStorage.getItem('speakup_gemini_model') || localStorage.getItem('aura_gemini_model');
+          const storedKey = localStorage.getItem('speakup_gemini_api_key') || localStorage.getItem('aura_gemini_api_key') || data.envApiKey || '';
+          const storedModel = localStorage.getItem('speakup_gemini_model') || localStorage.getItem('aura_gemini_model') || data.envModel;
           const validModels = ['gemma-4-e2b', 'gemma-4-31b-it', 'gemma-4-26b-a4b-it'];
 
           setApiKey(storedKey);
           if (storedModel && validModels.includes(storedModel)) {
             setModel(storedModel);
           } else if (mode === 'production') {
-            setModel('');
+            setModel(data.envModel || '');
           } else {
             setModel('gemma-4-e2b');
           }
