@@ -39,10 +39,24 @@ function getEnvVar(key: string, fallback: string = ""): string {
 
 /**
  * Universal App Mode Resolver
- * Returns 'production' on Vercel or when APP_MODE=production in .env
+ * Returns 'production' on any cloud host (Vercel, Render, Railway, Fly.io, etc.)
+ * or when NEXT_PUBLIC_APP_MODE=production in .env
  */
 function getAppMode(): 'local' | 'production' {
-  if (process.env.VERCEL) return 'production';
+  // Cloud platform detection
+  if (process.env.VERCEL) return 'production';              // Vercel
+  if (process.env.RENDER) return 'production';              // Render.com
+  if (process.env.RAILWAY_ENVIRONMENT) return 'production'; // Railway
+  if (process.env.FLY_APP_NAME) return 'production';       // Fly.io
+  if (process.env.HEROKU_APP_NAME) return 'production';    // Heroku
+  if (process.env.NODE_ENV === 'production') return 'production'; // Generic
+
+  // CWD-based detection: if running from /opt/render or /app or /var, it's a cloud server
+  const cwd = process.cwd();
+  if (cwd.startsWith('/opt/render') || cwd.startsWith('/app') || cwd.startsWith('/var/task')) {
+    return 'production';
+  }
+
   const raw = (getEnvVar("APP_MODE") || "").toLowerCase();
   if (raw === "production") return 'production';
   return 'local';
