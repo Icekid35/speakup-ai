@@ -31,6 +31,18 @@ python3 -m pip install --quiet faster-whisper
 
 echo "✅ faster-whisper installed: $(python3 -c 'import faster_whisper; print(faster_whisper.__version__)')"
 
+# Pre-download the tiny.en model weights at build time so there's no download spike
+# at runtime. tiny.en is 39MB — safe for Render free tier (512MB RAM limit).
+echo ""
+echo "⬇️  Pre-downloading Whisper tiny.en model weights..."
+python3 -c "
+from faster_whisper import WhisperModel
+print('Downloading tiny.en model...')
+m = WhisperModel('tiny.en', device='cpu', compute_type='int8', cpu_threads=1)
+del m
+print('tiny.en model cached successfully.')
+" && echo "✅ Whisper tiny.en model ready." || echo "⚠️  Model pre-download skipped (will download on first request)."
+
 # ----------------------------------------------------------
 # 3. Node: npm install + vite build
 # ----------------------------------------------------------

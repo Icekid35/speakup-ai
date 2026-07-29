@@ -476,21 +476,26 @@ async function extractWhisperTranscript(videoPath: string): Promise<string> {
 
     if (!fs.existsSync(tmpWav)) return "";
 
-    // Run Faster-Whisper small.en / base.en model for high accuracy speech recognition
+    // Run Faster-Whisper with the smallest models to fit Render free tier (512MB RAM limit).
+    // Model RAM usage: tiny.en ~75MB, base.en ~150MB, small.en ~500MB (OOM on free tier)
+    // int8 compute_type halves memory usage vs float32.
     const pyScript = `
-import sys, json
+import sys
 from faster_whisper import WhisperModel
 try:
-    model = WhisperModel('small.en', device='cpu', compute_type='float32', cpu_threads=4)
+    # tiny.en: 39MB weights, ~75MB peak RAM — fits comfortably in 512MB
+    model = WhisperModel('tiny.en', device='cpu', compute_type='int8', cpu_threads=2)
 except Exception:
     try:
-        model = WhisperModel('base.en', device='cpu', compute_type='float32', cpu_threads=4)
-    except Exception:
-        model = WhisperModel('base', device='cpu', compute_type='float32', cpu_threads=4)
+        model = WhisperModel('tiny', device='cpu', compute_type='int8', cpu_threads=2)
+    except Exception as e:
+        print('', end='')
+        sys.exit(0)
 
-segments, info = model.transcribe('${tmpWav}', beam_size=5, language='en')
+segments, info = model.transcribe('${tmpWav}', beam_size=1, language='en')
 full_text = ' '.join([s.text.strip() for s in segments if s.text])
 print(full_text)
+del model
 `;
     const pyPath = path.join(process.cwd(), `.tmp_py_${id}.py`);
     fs.writeFileSync(pyPath, pyScript);
