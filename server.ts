@@ -94,18 +94,17 @@ async function queryAI(
   const apiKey = getEnvVar("GEMINI_API_KEY");
   const appMode = (getEnvVar("APP_MODE") || (process.env.VERCEL ? "production" : "local")).toLowerCase();
   
-  let targetModel = options?.userModel;
-  if (appMode === "production" || process.env.VERCEL) {
-    if (!targetModel || targetModel === "gemma-4-e2b") {
-      targetModel = getEnvVar("GEMINI_MODEL", "gemma-4-31b-it");
-    }
-  } else {
-    targetModel = targetModel || getEnvVar("GEMINI_MODEL", "gemma-4-31b-it");
+  // ALWAYS honor options?.userModel if passed! Fallback to env GEMINI_MODEL or gemma-4-31b-it.
+  let targetModel = options?.userModel || getEnvVar("GEMINI_MODEL", "gemma-4-31b-it");
+
+  // In production mode (or on Vercel), if userModel is 'gemma-4-e2b' (which needs local server), switch to cloud model
+  if ((appMode === "production" || process.env.VERCEL) && targetModel === "gemma-4-e2b") {
+    targetModel = getEnvVar("GEMINI_MODEL", "gemma-4-31b-it");
   }
 
   // Cloud Gemini / Gemma API route
   if (targetModel !== "gemma-4-e2b" || appMode === "production" || process.env.VERCEL) {
-    const cloudModel = targetModel === "gemma-4-e2b" ? getEnvVar("GEMINI_MODEL", "gemma-4-31b-it") : targetModel;
+    const cloudModel = (targetModel === "gemma-4-e2b") ? getEnvVar("GEMINI_MODEL", "gemma-4-31b-it") : targetModel;
     if (!apiKey || !apiKey.trim()) {
       throw new Error("NEXT_PUBLIC_GEMINI_API_KEY or GEMINI_API_KEY is not configured in your .env / .env.local file.");
     }
