@@ -1,12 +1,12 @@
 import express from "express";
 import path from "path";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import { exec } from "child_process";
 import { promisify } from "util";
 const execAsync = promisify(exec);
 
 import fs from "fs";
+import dotenv from "dotenv";
 
 const app = express();
 const PORT = 3000;
@@ -14,10 +14,8 @@ const PORT = 3000;
 app.use(express.json({ limit: "200mb" }));
 app.use(express.urlencoded({ limit: "200mb", extended: true }));
 
-import dotenv from "dotenv";
-
 /**
- * Load environment variables using dotenv library from .env.local and .env
+ * Helper to parse .env.local and .env files natively
  */
 function loadEnvFile() {
   const envLocalPath = path.resolve(process.cwd(), ".env.local");
@@ -32,7 +30,14 @@ function loadEnvFile() {
 }
 loadEnvFile();
 
-const LITERT_SERVER_URL = process.env.LITERT_SERVER_URL || "http://127.0.0.1:9379";
+/**
+ * Universal Environment Variable Getter (supports NEXT_PUBLIC_ prefix)
+ */
+function getEnvVar(key: string, fallback: string = ""): string {
+  return process.env[`NEXT_PUBLIC_${key}`] || process.env[key] || fallback;
+}
+
+const LITERT_SERVER_URL = getEnvVar("LITERT_SERVER_URL", "http://127.0.0.1:9379");
 const MODEL_NAME = "gemma-4-e2b";
 
 /**
@@ -86,13 +91,13 @@ async function queryAI(
   options?: { userApiKey?: string; userModel?: string; systemInstruction?: string }
 ): Promise<string> {
   loadEnvFile();
-  const apiKey = process.env.GEMINI_API_KEY;
-  const appMode = (process.env.APP_MODE || (process.env.VERCEL ? "production" : "local")).toLowerCase();
+  const apiKey = getEnvVar("GEMINI_API_KEY");
+  const appMode = (getEnvVar("APP_MODE") || (process.env.VERCEL ? "production" : "local")).toLowerCase();
   
   let targetModel = options?.userModel;
   if (appMode === "production" || process.env.VERCEL) {
     if (!targetModel || targetModel === "gemma-4-e2b") {
-      targetModel = process.env.GEMINI_MODEL || "gemma-4-31b-it";
+      targetModel = getEnvVar("GEMINI_MODEL", "gemma-4-31b-it");
     }
   } else {
     targetModel = targetModel || "gemma-4-e2b";
@@ -100,9 +105,9 @@ async function queryAI(
 
   // Cloud Gemini / Gemma API route
   if (targetModel !== "gemma-4-e2b" || appMode === "production" || process.env.VERCEL) {
-    const cloudModel = targetModel === "gemma-4-e2b" ? (process.env.GEMINI_MODEL || "gemma-4-31b-it") : targetModel;
+    const cloudModel = targetModel === "gemma-4-e2b" ? getEnvVar("GEMINI_MODEL", "gemma-4-31b-it") : targetModel;
     if (!apiKey || !apiKey.trim()) {
-      throw new Error("GEMINI_API_KEY is not configured in your .env / .env.local file.");
+      throw new Error("NEXT_PUBLIC_GEMINI_API_KEY or GEMINI_API_KEY is not configured in your .env / .env.local file.");
     }
     console.log(`\n==================== [CLOUD GEMINI MODEL REQUEST: ${cloudModel}] ====================`);
     try {
@@ -941,20 +946,20 @@ Return ONLY valid JSON with this exact structure:
 
   // Application Mode & Config Endpoint
   app.get("/api/config", (req, res) => {
-    // loadEnvFile();
+    loadEnvFile();
     const isVercel = !!process.env.VERCEL || process.env.NODE_ENV === "production";
-    const rawAppMode = (process.env.APP_MODE || "").toLowerCase();
+    const rawAppMode = (getEnvVar("APP_MODE") || "").toLowerCase();
     const appMode = isVercel || rawAppMode === "production" ? "production" : "local";
 
-    const envApiKey = process.env.GEMINI_API_KEY || "AIzaSyBmFCdPByjcikR5yaGoX4FSzDys-N1_bss";
-    const envModel = process.env.GEMINI_MODEL || "gemma-4-31b-it";
+    const envApiKey = getEnvVar("GEMINI_API_KEY");
+    const envModel = getEnvVar("GEMINI_MODEL", "gemma-4-31b-it");
 
     res.json({
       appMode, // 'local' | 'production'
       isProduction: appMode === "production",
       defaultModel: appMode === "production" ? envModel : "gemma-4-e2b",
-      hasEnvApiKey: true,
-      envApiKey: envApiKey,
+      hasEnvApiKey: !!envApiKey,
+      envApiKey: envApiKey || null,
       envModel: envModel
     });
   });
@@ -965,7 +970,7 @@ Return ONLY valid JSON with this exact structure:
       loadEnvFile();
       const { model } = req.body;
       const isVercel = !!process.env.VERCEL || process.env.NODE_ENV === "production";
-      const rawAppMode = (process.env.APP_MODE || "").toLowerCase();
+      const rawAppMode = (getEnvVar("APP_MODE") || "").toLowerCase();
       const appMode = isVercel || rawAppMode === "production" ? "production" : "local";
 
       if (!model) {
@@ -1002,14 +1007,14 @@ Return ONLY valid JSON with this exact structure:
       }
 
       // Cloud Model Validation strictly using environment API key from .env / .env.local
-      const apiKey = process.env.GEMINI_API_KEY;
+      const apiKey = getEnvVar("GEMINI_API_KEY");
       if (!apiKey || !apiKey.trim()) {
-        return res.status(400).json({ valid: false, error: "GEMINI_API_KEY is not configured in your .env / .env.local file." });
+        return res.status(400).json({ valid: false, error: "NEXT_PUBLIC_GEMINI_API_KEY or GEMINI_API_KEY is not configured in your .env / .env.local file." });
       }
 
       const ai = new GoogleGenAI({ apiKey: apiKey.trim() });
       const response = await ai.models.generateContent({
-        model: model || process.env.GEMINI_MODEL || "gemma-4-31b-it",
+        model: model || getEnvVar("GEMINI_MODEL", "gemma-4-31b-it"),
         contents: "hi",
       });
 
@@ -1545,29 +1550,41 @@ Return JSON strictly:
     }
   });
 
-  // Vite Integration
-  if (process.env.NODE_ENV !== "production") {
-    const react = (await import("@vitejs/plugin-react")).default;
-    const vite = await createViteServer({
-      configFile: false,
-      plugins: [react()],
-      server: { middlewareMode: true, port: 3000, host: '0.0.0.0' },
-      appType: "spa",
-      resolve: {
-        alias: {
-          '@': process.cwd(),
+  // Vite Integration (Dev Mode Only)
+  if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
+    try {
+      const { createServer: createViteServer } = await import("vite");
+      const react = (await import("@vitejs/plugin-react")).default;
+      const vite = await createViteServer({
+        configFile: false,
+        plugins: [react()],
+        server: { middlewareMode: true, port: 3000, host: '0.0.0.0' },
+        appType: "spa",
+        resolve: {
+          alias: {
+            '@': process.cwd(),
+          }
         }
-      }
-    });
-    app.use(vite.middlewares);
+      });
+      app.use(vite.middlewares);
+    } catch (err) {
+      console.warn("⚠️ Vite dev server omitted in production environment.");
+    }
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
+    if (fs.existsSync(distPath)) {
+      app.use(express.static(distPath));
+    }
     app.get('*', (req, res) => {
       if (req.path.startsWith('/api')) {
         return res.status(404).json({ error: `API route ${req.path} not found` });
       }
-      res.sendFile(path.join(distPath, 'index.html'));
+      const indexPath = path.join(distPath, 'index.html');
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(404).json({ error: "Static index.html not found" });
+      }
     });
   }
 
