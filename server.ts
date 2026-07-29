@@ -17,17 +17,17 @@ app.use(express.urlencoded({ limit: "200mb", extended: true }));
 import dotenv from "dotenv";
 
 /**
- * Load environment variables using dotenv library
+ * Load environment variables using dotenv library from .env.local and .env
  */
 function loadEnvFile() {
-  const envPath = path.resolve(process.cwd(), ".env");
   const envLocalPath = path.resolve(process.cwd(), ".env.local");
+  const envPath = path.resolve(process.cwd(), ".env");
 
-  if (fs.existsSync(envPath)) {
-    dotenv.config({ path: envPath, override: true });
-  }
   if (fs.existsSync(envLocalPath)) {
     dotenv.config({ path: envLocalPath, override: true });
+  }
+  if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath, override: false });
   }
 }
 loadEnvFile();
@@ -79,16 +79,15 @@ async function queryGemma(
 
 /**
  * Dynamic AI Query Router:
- * Automatically routes prompts to either:
- * - Google Cloud Gemini/Gemma API when user provides userApiKey & cloud model
- * - Local LiteRT Gemma 4 E2B server when model is 'gemma-4-e2b' or in local mode
+ * Strictly uses process.env.GEMINI_API_KEY from .env / .env.local file
  */
 async function queryAI(
   messages: Array<{ role: string; content: string | any[] }>,
   options?: { userApiKey?: string; userModel?: string; systemInstruction?: string }
 ): Promise<string> {
+  loadEnvFile();
+  const apiKey = process.env.GEMINI_API_KEY;
   const appMode = (process.env.APP_MODE || (process.env.VERCEL ? "production" : "local")).toLowerCase();
-  const apiKey = (options?.userApiKey && options.userApiKey.trim()) || process.env.GEMINI_API_KEY || "AIzaSyBmFCdPByjcikR5yaGoX4FSzDys-N1_bss";
   
   let targetModel = options?.userModel;
   if (appMode === "production" || process.env.VERCEL) {
@@ -102,6 +101,9 @@ async function queryAI(
   // Cloud Gemini / Gemma API route
   if (targetModel !== "gemma-4-e2b" || appMode === "production" || process.env.VERCEL) {
     const cloudModel = targetModel === "gemma-4-e2b" ? (process.env.GEMINI_MODEL || "gemma-4-31b-it") : targetModel;
+    if (!apiKey || !apiKey.trim()) {
+      throw new Error("GEMINI_API_KEY is not configured in your .env / .env.local file.");
+    }
     console.log(`\n==================== [CLOUD GEMINI MODEL REQUEST: ${cloudModel}] ====================`);
     try {
       const ai = new GoogleGenAI({ apiKey: apiKey.trim() });
@@ -120,11 +122,14 @@ async function queryAI(
       return text;
     } catch (cloudErr: any) {
       console.error(`❌ Cloud Gemini API Error (${cloudModel}):`, cloudErr.message);
+      if (cloudErr.message && (cloudErr.message.includes("leaked") || cloudErr.message.includes("PERMISSION_DENIED"))) {
+        throw new Error("The GEMINI_API_KEY in your .env file was reported as leaked and revoked by Google. Please update GEMINI_API_KEY in your .env file with a fresh key from aistudio.google.com");
+      }
       throw new Error(`Cloud Gemini API Error (${cloudModel}): ${cloudErr.message}`);
     }
   }
 
-  // Local LiteRT Gemma 4 E2B route (only in local mode when gemma-4-e2b is explicitly selected)
+  // Local LiteRT Gemma 4 E2B route
   return queryGemma(messages, options?.systemInstruction);
 }
 
@@ -936,7 +941,7 @@ Return ONLY valid JSON with this exact structure:
 
   // Application Mode & Config Endpoint
   app.get("/api/config", (req, res) => {
-    loadEnvFile();
+    // loadEnvFile();
     const isVercel = !!process.env.VERCEL || process.env.NODE_ENV === "production";
     const rawAppMode = (process.env.APP_MODE || "").toLowerCase();
     const appMode = isVercel || rawAppMode === "production" ? "production" : "local";
@@ -996,25 +1001,30 @@ Return ONLY valid JSON with this exact structure:
         }
       }
 
-      // Cloud Model Validation via real ping request to Google Gemini API
-      const effectiveKey = (req.body.apiKey && req.body.apiKey.trim()) || process.env.GEMINI_API_KEY || "AIzaSyBmFCdPByjcikR5yaGoX4FSzDys-N1_bss";
+      // Cloud Model Validation strictly using environment API key from .env / .env.local
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey || !apiKey.trim()) {
+        return res.status(400).json({ valid: false, error: "GEMINI_API_KEY is not configured in your .env / .env.local file." });
+      }
 
-      const ai = new GoogleGenAI({ apiKey: effectiveKey.trim() });
+      const ai = new GoogleGenAI({ apiKey: apiKey.trim() });
       const response = await ai.models.generateContent({
         model: model || process.env.GEMINI_MODEL || "gemma-4-31b-it",
         contents: "hi",
       });
 
       if (response && response.text !== undefined) {
-        return res.json({ valid: true, model, message: "Model verified successfully!" });
+        return res.json({ valid: true, model, message: "Model verified successfully using .env key!" });
       } else {
         return res.status(400).json({ valid: false, error: "Model returned an empty response. Verify model availability." });
       }
     } catch (err: any) {
       console.error("❌ Key Validation Error:", err.message);
       let userFriendlyMsg = err.message || "Model verification failed.";
-      if (userFriendlyMsg.includes("API_KEY_INVALID") || userFriendlyMsg.includes("400") || userFriendlyMsg.includes("401") || userFriendlyMsg.includes("403")) {
-        userFriendlyMsg = "API key or model request failed. Please select a valid Gemma model.";
+      if (userFriendlyMsg.includes("leaked") || userFriendlyMsg.includes("PERMISSION_DENIED")) {
+        userFriendlyMsg = "The GEMINI_API_KEY in your .env file was reported as leaked and revoked by Google. Please update GEMINI_API_KEY in your .env file with a fresh key from aistudio.google.com.";
+      } else if (userFriendlyMsg.includes("API_KEY_INVALID") || userFriendlyMsg.includes("400") || userFriendlyMsg.includes("401") || userFriendlyMsg.includes("403")) {
+        userFriendlyMsg = "Invalid API Key in .env file. Please check your credentials at aistudio.google.com.";
       }
       return res.status(400).json({ valid: false, error: userFriendlyMsg });
     }
