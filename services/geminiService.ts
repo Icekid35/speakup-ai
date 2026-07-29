@@ -18,6 +18,69 @@ const getUserModel = (): string | undefined => {
   return localStorage.getItem('speakup_gemini_model') || localStorage.getItem('aura_gemini_model') || undefined;
 };
 
+export const extractVideoFramesClient = (blob: Blob, frameCount: number = 5): Promise<string[]> => {
+  return new Promise((resolve) => {
+    try {
+      const video = document.createElement('video');
+      video.muted = true;
+      video.playsInline = true;
+      video.crossOrigin = 'anonymous';
+      const url = URL.createObjectURL(blob);
+      video.src = url;
+
+      const frames: string[] = [];
+
+      video.onloadedmetadata = async () => {
+        try {
+          const duration = video.duration && isFinite(video.duration) ? video.duration : 10;
+          const canvas = document.createElement('canvas');
+          const maxDim = 512;
+          const vw = video.videoWidth || 640;
+          const vh = video.videoHeight || 360;
+          const scale = Math.min(1, maxDim / Math.max(vw, vh));
+          canvas.width = Math.round(vw * scale);
+          canvas.height = Math.round(vh * scale);
+          const ctx = canvas.getContext('2d');
+
+          const timestamps: number[] = [];
+          for (let i = 0; i < frameCount; i++) {
+            timestamps.push(((i + 0.5) / frameCount) * duration);
+          }
+
+          for (const t of timestamps) {
+            await new Promise<void>((res) => {
+              const onSeeked = () => {
+                video.removeEventListener('seeked', onSeeked);
+                if (ctx) {
+                  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                  const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                  const base64 = dataUrl.split(',')[1];
+                  if (base64) frames.push(base64);
+                }
+                res();
+              };
+              video.addEventListener('seeked', onSeeked);
+              video.currentTime = Math.min(t, duration - 0.1);
+            });
+          }
+          URL.revokeObjectURL(url);
+          resolve(frames);
+        } catch {
+          URL.revokeObjectURL(url);
+          resolve([]);
+        }
+      };
+
+      video.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve([]);
+      };
+    } catch {
+      resolve([]);
+    }
+  });
+};
+
 export const analyzeVideo = async (
   blob: Blob,
   mode: 'full' | 'drill' = 'full',
@@ -25,13 +88,24 @@ export const analyzeVideo = async (
   videoDuration?: number
 ): Promise<SpeakUpAnalysis> => {
   const dur = videoDuration && videoDuration > 0 ? Math.round(videoDuration) : 60;
-  const videoBase64 = await blobToBase64(blob);
+  let videoBase64 = await blobToBase64(blob);
+  let framesBase64: string[] = [];
+
+  // Vercel Serverless Function payload limit is 4.5 MB.
+  // If base64 string exceeds 2.5 MB (2,500,000 chars), extract compressed client JPEG frames (~100KB)
+  // to avoid Vercel HTTP 413 (Content Too Large) errors.
+  if (videoBase64.length > 2500000) {
+    console.log(`📹 Video payload size (${Math.round(videoBase64.length / 1024)}KB) exceeds Vercel 3MB limit. Extracting compressed client frames...`);
+    framesBase64 = await extractVideoFramesClient(blob, 5);
+    videoBase64 = ""; // Omit large video base64 string so HTTP payload stays < 300KB
+  }
 
   const res = await fetch("/api/analyze", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       videoBase64,
+      framesBase64,
       mimeType: blob.type || "video/mp4",
       mode,
       context,

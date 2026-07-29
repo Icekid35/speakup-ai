@@ -1083,7 +1083,7 @@ Return ONLY valid JSON with this exact structure:
   // Video Analysis Endpoint
   app.post("/api/analyze", async (req, res) => {
     try {
-      const { videoBase64, mimeType, mode, context, transcript, videoDuration, userApiKey, userModel } = req.body;
+      const { videoBase64, framesBase64, mimeType, mode, context, transcript, videoDuration, userApiKey, userModel } = req.body;
       if (mode === 'drill' && !context) {
         return res.status(400).json({ error: "context is required for drill mode" });
       }
@@ -1108,6 +1108,23 @@ Return ONLY valid JSON with this exact structure:
           console.warn("⚠️ Local video processing warning:", e.message);
         } finally {
           if (fs.existsSync(tmpVid)) try { fs.unlinkSync(tmpVid); } catch {}
+        }
+      }
+
+      if (framesBase64 && Array.isArray(framesBase64) && framesBase64.length > 0 && !realVisionObs) {
+        const midFrame = framesBase64[Math.floor(framesBase64.length / 2)] || framesBase64[0];
+        const visionPrompt = [
+          { type: "image_url", image_url: { url: `data:image/jpeg;base64,${midFrame}` } },
+          {
+            type: "text",
+            text: "In exactly 2 sentences describe: (1) Is the speaker's eye contact strong or looking away? (2) Is their posture confident or slouched? Be specific."
+          }
+        ];
+        try {
+          realVisionObs = await queryAI([{ role: "user", content: visionPrompt }], { userModel });
+          console.log("👁️ CLIENT FRAME VISION OBSERVATION:", realVisionObs.slice(0, 200));
+        } catch (e: any) {
+          console.warn("⚠️ Client frame vision evaluation failed:", e.message);
         }
       }
 
