@@ -1028,7 +1028,7 @@ Return ONLY valid JSON with this exact structure:
           const testRes = await fetch(`${LITERT_SERVER_URL}/v1/chat/completions`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            signal: AbortSignal.timeout(4000),
+            signal: AbortSignal.timeout(20000),
             body: JSON.stringify({
               model: "gemma-4-e2b",
               messages: [{ role: "user", content: "hi" }],
