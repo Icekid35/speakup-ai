@@ -15,22 +15,38 @@ app.use(express.json({ limit: "200mb" }));
 app.use(express.urlencoded({ limit: "200mb", extended: true }));
 
 /**
- * Helper to parse .env file natively without third-party module dependency
+ * Helper to parse .env, .env.local, and .env.* files natively without third-party module dependency
  */
 function loadEnvFile() {
-  const envPath = path.resolve(process.cwd(), ".env");
-  if (fs.existsSync(envPath)) {
-    const content = fs.readFileSync(envPath, "utf-8");
-    content.split("\n").forEach((line) => {
-      const trimmed = line.trim();
-      if (trimmed && !trimmed.startsWith("#") && trimmed.includes("=")) {
-        const [key, ...valueParts] = trimmed.split("=");
-        const value = valueParts.join("=").trim().replace(/^["']|["']$/g, "");
-        if (key && value) {
-          process.env[key.trim()] = value;
-        }
+  const envFiles = [".env", ".env.local", ".env.production", ".env.development"];
+  let loadedCount = 0;
+  envFiles.forEach((file) => {
+    const envPath = path.resolve(process.cwd(), file);
+    if (fs.existsSync(envPath)) {
+      try {
+        const content = fs.readFileSync(envPath, "utf-8");
+        content.split(/\r?\n/).forEach((line) => {
+          const trimmed = line.trim();
+          if (trimmed && !trimmed.startsWith("#") && trimmed.includes("=")) {
+            const index = trimmed.indexOf("=");
+            const key = trimmed.substring(0, index).trim();
+            let value = trimmed.substring(index + 1).trim();
+            if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+              value = value.substring(1, value.length - 1);
+            }
+            if (key && value) {
+              process.env[key] = value;
+              loadedCount++;
+            }
+          }
+        });
+      } catch (err) {
+        console.error(`❌ Error reading ${file}:`, err);
       }
-    });
+    }
+  });
+  if (loadedCount > 0) {
+    console.log(`✅ Loaded ${loadedCount} environment variable(s) from .env / .env.local`);
   }
 }
 loadEnvFile();
