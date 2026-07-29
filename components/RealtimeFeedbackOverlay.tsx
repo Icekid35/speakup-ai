@@ -7,7 +7,7 @@ interface RealtimeFeedbackOverlayProps {
   isActive: boolean;
   onClose?: () => void;
 }
-
+  
 export const RealtimeFeedbackOverlay: React.FC<RealtimeFeedbackOverlayProps> = ({
   stream,
   isActive,
