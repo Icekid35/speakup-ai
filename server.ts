@@ -435,9 +435,9 @@ print(full_text)
 }
 
 /**
- * Extract key video frames and analyze visual posture/eye contact via Gemma 4 E2B Vision
+ * Extract key video frames and analyze visual posture/eye contact via configured AI model
  */
-async function extractVisionObservation(videoPath: string, totalDur: number): Promise<string> {
+async function extractVisionObservation(videoPath: string, totalDur: number, userModel?: string): Promise<string> {
   const id = `${Date.now()}_${Math.floor(Math.random() * 10000)}`;
   const framePaths: string[] = [];
   try {
@@ -462,8 +462,8 @@ async function extractVisionObservation(videoPath: string, totalDur: number): Pr
       }
     ];
 
-    const obs = await queryGemma([{ role: "user", content: visionPrompt }]);
-    console.log("👁️ REAL GEMMA 4 VISION OBSERVATION:", obs.slice(0, 200));
+    const obs = await queryAI([{ role: "user", content: visionPrompt }], { userModel });
+    console.log("👁️ VISION OBSERVATION:", obs.slice(0, 200));
     return obs;
   } catch (err: any) {
     console.warn("⚠️ Vision frame extraction failed:", err.message);
@@ -1102,8 +1102,8 @@ Return ONLY valid JSON with this exact structure:
           const wText = await extractWhisperTranscript(tmpVid);
           if (wText) realTranscript = wText;
 
-          // 2. Extract 100% real visual evaluation using Gemma 4 Vision
-          realVisionObs = await extractVisionObservation(tmpVid, totalDur);
+          // 2. Extract real visual evaluation using the user-selected AI model
+          realVisionObs = await extractVisionObservation(tmpVid, totalDur, userModel);
         } catch (e: any) {
           console.warn("⚠️ Local video processing warning:", e.message);
         } finally {
@@ -1195,10 +1195,11 @@ Return ONLY valid JSON. Do not include markdown code block formatting.`;
 
         let parsed: any = null;
         try {
-          const raw = await queryGemma([{ role: "user", content: holisticPrompt }]);
+          // Route through queryAI so user-selected model is always honored
+          const raw = await queryAI([{ role: "user", content: holisticPrompt }], { userModel });
           parsed = cleanAndParseJSON(raw, null);
         } catch (gemmaErr) {
-          console.warn("⚠️ Local Gemma holistic analysis failed, using dynamic builder:", gemmaErr);
+          console.warn("⚠️ Holistic AI analysis failed, using dynamic builder:", gemmaErr);
         }
 
         if (parsed && parsed.segments && parsed.segments.length > 0) {
@@ -1226,7 +1227,8 @@ Context - Advice to Fix: "${context.advice}"
 Original issue: "${context.observation}"
 Return single-segment JSON.`;
 
-        const rawContent = await queryGemma([{ role: "user", content: drillPrompt }], SYSTEM_INSTRUCTION);
+        // Route through queryAI so user-selected model is always honored
+        const rawContent = await queryAI([{ role: "user", content: drillPrompt }], { userModel, systemInstruction: SYSTEM_INSTRUCTION });
         const fullAnalysis = buildFullTimelineAnalysis(totalDur, realTranscript, mode);
         const parsed = cleanAndParseJSON(rawContent, null);
         return res.json(parsed || fullAnalysis);
@@ -1553,7 +1555,7 @@ Return JSON strictly:
   // Real-time Feedback Endpoint
   app.post("/api/realtime-feedback", async (req, res) => {
     try {
-      const { recentTranscript, paceWpm, energyLevel, pitchVariation, fillerCount, currentFillers } = req.body;
+      const { recentTranscript, paceWpm, energyLevel, pitchVariation, fillerCount, currentFillers, userModel } = req.body;
 
       const prompt = `
 You are SpeakUp, an elite live public speaking coach providing instant feedback.
@@ -1576,7 +1578,8 @@ Return JSON strictly:
 }
 `;
 
-      const rawContent = await queryGemma([{ role: "user", content: prompt }]);
+      // Route through queryAI so user-selected model is always honored
+      const rawContent = await queryAI([{ role: "user", content: prompt }], { userModel });
       const fallback = {
         suggestion: paceWpm > 160 ? "Slow down slightly and emphasize key words." : "Maintain steady eye contact and clear posture.",
         category: paceWpm > 160 ? "pace" as const : "tone" as const,
