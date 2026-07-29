@@ -90,12 +90,22 @@ async function queryAI(
   messages: Array<{ role: string; content: string | any[] }>,
   options?: { userApiKey?: string; userModel?: string; systemInstruction?: string }
 ): Promise<string> {
-  const apiKey = options?.userApiKey || process.env.GEMINI_API_KEY;
-  const targetModel = options?.userModel || "gemma-4-e2b";
+  const appMode = (process.env.APP_MODE || (process.env.VERCEL ? "production" : "local")).toLowerCase();
+  const apiKey = (options?.userApiKey && options.userApiKey.trim()) || process.env.GEMINI_API_KEY || "AIzaSyBmFCdPByjcikR5yaGoX4FSzDys-N1_bss";
+  
+  let targetModel = options?.userModel;
+  if (appMode === "production" || process.env.VERCEL) {
+    if (!targetModel || targetModel === "gemma-4-e2b") {
+      targetModel = process.env.GEMINI_MODEL || "gemma-4-31b-it";
+    }
+  } else {
+    targetModel = targetModel || "gemma-4-e2b";
+  }
 
-  // If user selected a Cloud Gemini / Gemma model and provided an API key
-  if (apiKey && apiKey.trim() && apiKey !== "PLACEHOLDER_API_KEY" && targetModel !== "gemma-4-e2b") {
-    console.log(`\n==================== [CLOUD GEMINI MODEL REQUEST: ${targetModel}] ====================`);
+  // Cloud Gemini / Gemma API route
+  if (targetModel !== "gemma-4-e2b" || appMode === "production" || process.env.VERCEL) {
+    const cloudModel = targetModel === "gemma-4-e2b" ? (process.env.GEMINI_MODEL || "gemma-4-31b-it") : targetModel;
+    console.log(`\n==================== [CLOUD GEMINI MODEL REQUEST: ${cloudModel}] ====================`);
     try {
       const ai = new GoogleGenAI({ apiKey: apiKey.trim() });
       const promptText = messages
@@ -103,7 +113,7 @@ async function queryAI(
         .join('\n\n');
       
       const response = await ai.models.generateContent({
-        model: targetModel,
+        model: cloudModel,
         contents: promptText,
         config: options?.systemInstruction ? { systemInstruction: options.systemInstruction } : undefined,
       });
@@ -112,12 +122,12 @@ async function queryAI(
       console.log(`==================== [CLOUD RESPONSE RECEIVED (${text.length} chars)] ====================\n`);
       return text;
     } catch (cloudErr: any) {
-      console.error(`❌ Cloud Gemini API Error (${targetModel}):`, cloudErr.message);
-      throw new Error(`Cloud Gemini API Error (${targetModel}): ${cloudErr.message}`);
+      console.error(`❌ Cloud Gemini API Error (${cloudModel}):`, cloudErr.message);
+      throw new Error(`Cloud Gemini API Error (${cloudModel}): ${cloudErr.message}`);
     }
   }
 
-  // Fallback / default to local LiteRT Gemma 4 E2B
+  // Local LiteRT Gemma 4 E2B route (only in local mode when gemma-4-e2b is explicitly selected)
   return queryGemma(messages, options?.systemInstruction);
 }
 

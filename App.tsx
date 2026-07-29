@@ -74,17 +74,6 @@ function App() {
   const handleAnalyze = async (videoDuration?: number) => {
     if (!videoBlob) return;
 
-    const storedModel = localStorage.getItem('speakup_gemini_model') || localStorage.getItem('aura_gemini_model');
-    try {
-      const configRes = await fetch('/api/config');
-      const configData = await configRes.json();
-      if (configData.appMode === 'production' && !storedModel) {
-        setApiKeyModalNotice("Production Mode: No AI model selected. Please select a model and validate your API key to proceed.");
-        setIsApiKeyModalOpen(true);
-        return;
-      }
-    } catch {}
-
     setIsAnalyzing(true);
     setAnalysisProgress(0);
     setCoachScript(null);

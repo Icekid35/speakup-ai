@@ -22,29 +22,20 @@ export const Header: React.FC<HeaderProps> = ({
       .then(res => res.json())
       .then(data => {
         const mode = data.appMode || 'local';
-        const storedModel = localStorage.getItem('speakup_gemini_model') || localStorage.getItem('aura_gemini_model');
-        const storedKey = localStorage.getItem('speakup_gemini_api_key') || localStorage.getItem('aura_gemini_api_key');
-
-        const activeKey = storedKey || data.envApiKey || '';
-        const activeModel = storedModel || data.envModel || (mode === 'production' ? '' : 'gemma-4-e2b');
-
-        const validModels = ['gemma-4-e2b', 'gemma-4-31b-it', 'gemma-4-26b-a4b-it'];
+        let storedModel = localStorage.getItem('speakup_gemini_model') || localStorage.getItem('aura_gemini_model');
 
         if (mode === 'production') {
-          if (activeKey && activeModel && validModels.includes(activeModel)) {
-            setIsConfigured(true);
-            formatModelName(activeModel);
-            if (!storedModel && activeModel) localStorage.setItem('speakup_gemini_model', activeModel);
-            if (!storedKey && activeKey) localStorage.setItem('speakup_gemini_api_key', activeKey);
-          } else {
-            setIsConfigured(false);
-            setModelLabel('ENTER API KEY');
+          if (!storedModel || storedModel === 'gemma-4-e2b') {
+            storedModel = 'gemma-4-31b-it';
+            localStorage.setItem('speakup_gemini_model', 'gemma-4-31b-it');
           }
+          setIsConfigured(true);
+          formatModelName(storedModel);
         } else {
           // Local Mode
-          if (activeKey && activeModel && validModels.includes(activeModel) && activeModel !== 'gemma-4-e2b') {
+          if (storedModel && storedModel !== 'gemma-4-e2b') {
             setIsConfigured(true);
-            formatModelName(activeModel);
+            formatModelName(storedModel);
           } else {
             setIsConfigured(true);
             localStorage.setItem('speakup_gemini_model', 'gemma-4-e2b');
@@ -54,7 +45,7 @@ export const Header: React.FC<HeaderProps> = ({
       })
       .catch(() => {
         setIsConfigured(true);
-        setModelLabel('LOCAL GEMMA 4 E2B');
+        setModelLabel('GEMMA 4 31B IT');
       });
   };
 

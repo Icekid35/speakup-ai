@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Key, Shield, Sparkles, X, Check, Trash2, Cpu, AlertTriangle, Loader2 } from 'lucide-react';
+import { Key, Shield, Sparkles, X, Check, Cpu, AlertTriangle, Loader2, Info } from 'lucide-react';
 
 interface ApiKeyModalProps {
   isOpen: boolean;
@@ -14,8 +14,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
   onKeySaved,
   initialMessage
 }) => {
-  const [apiKey, setApiKey] = useState('');
-  const [model, setModel] = useState('');
+  const [model, setModel] = useState('gemma-4-31b-it');
   const [appMode, setAppMode] = useState<'local' | 'production'>('local');
   const [isValidating, setIsValidating] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -33,23 +32,23 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
           const mode = data.appMode || 'local';
           setAppMode(mode);
 
-          const storedKey = localStorage.getItem('speakup_gemini_api_key') || localStorage.getItem('aura_gemini_api_key') || data.envApiKey || '';
-          const storedModel = localStorage.getItem('speakup_gemini_model') || localStorage.getItem('aura_gemini_model') || data.envModel;
+          const storedModel = localStorage.getItem('speakup_gemini_model') || localStorage.getItem('aura_gemini_model');
           const validModels = ['gemma-4-e2b', 'gemma-4-31b-it', 'gemma-4-26b-a4b-it'];
 
-          setApiKey(storedKey);
           if (storedModel && validModels.includes(storedModel)) {
-            setModel(storedModel);
+            if (mode === 'production' && storedModel === 'gemma-4-e2b') {
+              setModel('gemma-4-31b-it');
+            } else {
+              setModel(storedModel);
+            }
           } else if (mode === 'production') {
-            setModel(data.envModel || '');
+            setModel(data.envModel || 'gemma-4-31b-it');
           } else {
             setModel('gemma-4-e2b');
           }
         })
         .catch(() => {
-          const storedKey = localStorage.getItem('speakup_gemini_api_key') || localStorage.getItem('aura_gemini_api_key') || '';
-          const storedModel = localStorage.getItem('speakup_gemini_model') || localStorage.getItem('aura_gemini_model') || 'gemma-4-e2b';
-          setApiKey(storedKey);
+          const storedModel = localStorage.getItem('speakup_gemini_model') || localStorage.getItem('aura_gemini_model') || 'gemma-4-31b-it';
           setModel(storedModel);
         });
     }
@@ -57,14 +56,12 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
 
   if (!isOpen) return null;
 
+  const isLocalSelectedInProduction = appMode === 'production' && model === 'gemma-4-e2b';
+
   const handleSave = async () => {
+    if (isLocalSelectedInProduction) return;
     if (!model) {
       setErrorMsg('Please select an AI model before proceeding.');
-      return;
-    }
-
-    if (model !== 'gemma-4-e2b' && !apiKey.trim()) {
-      setErrorMsg('API Key is required for cloud models.');
       return;
     }
 
@@ -72,46 +69,20 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
     setErrorMsg(null);
 
     try {
-      const res = await fetch('/api/validate-key', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey: apiKey.trim(), model })
-      });
+      localStorage.setItem('speakup_gemini_model', model);
+      localStorage.setItem('aura_gemini_model', model);
 
-      const data = await res.json();
+      window.dispatchEvent(new CustomEvent('speakup_model_changed', { detail: { model } }));
+      window.dispatchEvent(new CustomEvent('aura_model_changed', { detail: { model } }));
 
-      if (res.ok && data.valid) {
-        if (apiKey.trim()) {
-          localStorage.setItem('speakup_gemini_api_key', apiKey.trim());
-          localStorage.setItem('aura_gemini_api_key', apiKey.trim());
-        } else {
-          localStorage.removeItem('speakup_gemini_api_key');
-          localStorage.removeItem('aura_gemini_api_key');
-        }
-        localStorage.setItem('speakup_gemini_model', model);
-        localStorage.setItem('aura_gemini_model', model);
-
-        window.dispatchEvent(new CustomEvent('speakup_model_changed', { detail: { model, apiKey: apiKey.trim() } }));
-        window.dispatchEvent(new CustomEvent('aura_model_changed', { detail: { model, apiKey: apiKey.trim() } }));
-        
-        setSaved(true);
-        onKeySaved();
-        setTimeout(() => { onClose(); }, 800);
-      } else {
-        setErrorMsg(data.error || 'Validation failed. Please verify your credentials.');
-      }
+      setSaved(true);
+      onKeySaved();
+      setTimeout(() => { onClose(); }, 600);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Validation request failed. Check your network connection.');
+      setErrorMsg(err.message || 'Failed to save model configuration.');
     } finally {
       setIsValidating(false);
     }
-  };
-
-  const handleClear = () => {
-    localStorage.removeItem('speakup_gemini_api_key');
-    localStorage.removeItem('aura_gemini_api_key');
-    setApiKey('');
-    setErrorMsg(null);
   };
 
   return (
@@ -122,14 +93,14 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
         <div className="flex items-center justify-between mb-5 border-b border-slate-100 pb-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
-              <Key className="w-5 h-5" />
+              <Cpu className="w-5 h-5" />
             </div>
             <div>
               <h2 className="text-base font-mono font-bold text-slate-900">
-                AI Model Configuration
+                AI Model Selection
               </h2>
               <p className="text-xs text-slate-500">
-                Mode: <span className="text-indigo-600 font-mono font-bold uppercase">{appMode}</span> — Choose & Verify Your Model
+                Environment: <span className="text-indigo-600 font-mono font-bold uppercase">{appMode}</span>
               </p>
             </div>
           </div>
@@ -141,7 +112,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
           </button>
         </div>
 
-        {/* Validation Error Banner */}
+        {/* Error Banner */}
         {errorMsg && (
           <div className="mb-5 bg-rose-50 border border-rose-200 rounded-2xl p-3.5 flex items-start gap-3 text-rose-700">
             <AlertTriangle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
@@ -152,69 +123,40 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
           </div>
         )}
 
-        {/* Mode Info Notice */}
-        {appMode === 'production' && !localStorage.getItem('speakup_gemini_model') && !localStorage.getItem('aura_gemini_model') && !errorMsg && (
-          <div className="mb-5 bg-amber-50 border border-amber-200 rounded-2xl p-3.5 flex items-start gap-3 text-amber-700">
-            <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+        {/* Local Selected in Production Warning */}
+        {isLocalSelectedInProduction && (
+          <div className="mb-5 bg-amber-50 border border-amber-200 rounded-2xl p-3.5 flex items-start gap-3 text-amber-800">
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
             <div className="text-xs leading-relaxed">
-              <span className="font-bold text-amber-800">No Model Selected:</span> Production mode requires an AI model and API key before running analysis.
+              <span className="font-bold text-amber-900">Local Model Unavailable: </span>
+              Local Gemma 4 E2B is only available when running locally on your device. Please select a cloud Gemma model for production mode.
             </div>
           </div>
         )}
 
         {/* Form Body */}
         <div className="space-y-5 mb-6">
-          {/* Model Selection */}
+          {/* Model Selection Dropdown */}
           <div>
             <label className="block text-xs font-mono font-bold text-indigo-600 uppercase tracking-wider mb-2 flex items-center gap-2">
-              <Cpu className="w-3.5 h-3.5" /> Choose AI Model
+              <Cpu className="w-3.5 h-3.5" /> Select Active Gemma Model
             </label>
             <select
               value={model}
               onChange={(e) => { setModel(e.target.value); setErrorMsg(null); }}
               className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-900 focus:outline-none focus:border-indigo-400 font-mono transition-colors"
             >
-              <option value="" disabled>-- Select Gemma Model --</option>
+              <option value="gemma-4-31b-it">Gemma 4 31B IT (Recommended — Cloud API)</option>
+              <option value="gemma-4-26b-a4b-it">Gemma 4 26B A4B IT (Cloud API)</option>
               <option value="gemma-4-e2b">Local Gemma 4 E2B (LiteRT Local Server)</option>
-              <option value="gemma-4-31b-it">Gemma 4 31B IT (Google Cloud API)</option>
-              <option value="gemma-4-26b-a4b-it">Gemma 4 26B A4B IT (Google Cloud API)</option>
             </select>
           </div>
 
-          {/* API Key Input */}
-          <div>
-            <label className="block text-xs font-mono font-bold text-indigo-600 uppercase tracking-wider mb-2 flex justify-between">
-              <span>Google Gemini API Key {model === 'gemma-4-e2b' ? '(Optional for Local)' : '(Required)'}</span>
-              {apiKey && <span className="text-emerald-600 font-sans text-[11px] font-normal">Key Active</span>}
-            </label>
-            <div className="relative">
-              <input
-                type="password"
-                value={apiKey}
-                onChange={(e) => { setApiKey(e.target.value); setErrorMsg(null); }}
-                placeholder={model === 'gemma-4-e2b' ? 'Not required for Local Gemma 4 E2B' : 'AIzaSy...'}
-                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-400 font-mono transition-colors"
-              />
-              {apiKey && (
-                <button 
-                  onClick={handleClear}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-rose-500 transition-colors"
-                  title="Clear Key"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-            <p className="text-[11px] text-slate-400 mt-1.5">
-              Validated before saving. Stored only in your browser's <code className="text-indigo-600">localStorage</code>.
-            </p>
-          </div>
-
-          {/* Info Banner */}
+          {/* Automatic API Key Status Notice */}
           <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 flex items-start gap-3">
-            <Shield className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
+            <Shield className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
             <div className="text-xs text-slate-600 leading-relaxed">
-              <span className="font-bold text-slate-800">Secure Validation:</span> Clicking <code className="text-indigo-600">SAVE & APPLY</code> runs a quick verification ping before saving your credentials.
+              <span className="font-bold text-slate-800">API Credentials Pre-configured:</span> API authentication is handled automatically via environment configuration (<code className="text-indigo-600">.env</code>).
             </div>
           </div>
         </div>
@@ -230,8 +172,8 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
           </button>
           <button
             onClick={handleSave}
-            disabled={isValidating}
-            className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 text-white font-mono text-xs font-bold hover:bg-indigo-700 transition-all shadow-sm disabled:opacity-50"
+            disabled={isValidating || isLocalSelectedInProduction}
+            className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 text-white font-mono text-xs font-bold hover:bg-indigo-700 transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {isValidating ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -240,7 +182,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
             ) : (
               <Sparkles className="w-4 h-4" />
             )}
-            {isValidating ? 'Verifying...' : saved ? 'Saved Successfully!' : 'Save & Apply'}
+            {isValidating ? 'Saving...' : saved ? 'Saved!' : 'Save & Apply'}
           </button>
         </div>
       </div>
