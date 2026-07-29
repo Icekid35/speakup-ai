@@ -260,9 +260,7 @@ export const VideoStage: React.FC<VideoStageProps> = ({
             } ${!videoAspectRatio && (videoUrl || isRecording) ? 'aspect-video' : ''}`}
             style={{
               aspectRatio: (videoUrl || isRecording) && videoAspectRatio ? `${videoAspectRatio}` : undefined,
-              maxHeight: (videoUrl || isRecording)
-                ? (videoAspectRatio && videoAspectRatio < 1 ? '55vh' : '70vh')
-                : undefined,
+              maxHeight: (videoUrl || isRecording) ? '80vh' : undefined,
             }}
           >
 
@@ -270,7 +268,7 @@ export const VideoStage: React.FC<VideoStageProps> = ({
             <video
               ref={videoRef}
               onLoadedMetadata={handleLoadedMetadata}
-              className={`absolute inset-0 w-full h-full object-cover ${isRecording ? '-scale-x-1' : ''} ${!videoUrl && !isRecording ? 'hidden' : 'block'}`}
+              className={`w-full h-full max-h-[80vh] ${isRecording ? 'object-cover -scale-x-1' : 'object-contain'} ${!videoUrl && !isRecording ? 'hidden' : 'block'}`}
               onTimeUpdate={handleMainTimeUpdate}
               playsInline
             />
