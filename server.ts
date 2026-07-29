@@ -1575,7 +1575,7 @@ Return JSON strictly:
     if (fs.existsSync(distPath)) {
       app.use(express.static(distPath));
     }
-    app.get('*', (req, res) => {
+    app.use((req, res) => {
       if (req.path.startsWith('/api')) {
         return res.status(404).json({ error: `API route ${req.path} not found` });
       }
