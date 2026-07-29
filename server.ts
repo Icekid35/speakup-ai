@@ -7,6 +7,7 @@ import { promisify } from "util";
 const execAsync = promisify(exec);
 
 import fs from "fs";
+import dotenv from "dotenv";
 
 const app = express();
 const PORT = 3000;
@@ -15,41 +16,15 @@ app.use(express.json({ limit: "200mb" }));
 app.use(express.urlencoded({ limit: "200mb", extended: true }));
 
 /**
- * Helper to parse .env, .env.local, and .env.* files natively without third-party module dependency
+ * Load environment variables using dotenv library across .env and .env.local
  */
-function loadEnvFile() {
-  const envFiles = [".env", ".env.local", ".env.production", ".env.development"];
-  let loadedCount = 0;
-  envFiles.forEach((file) => {
-    const envPath = path.resolve(process.cwd(), file);
-    if (fs.existsSync(envPath)) {
-      try {
-        const content = fs.readFileSync(envPath, "utf-8");
-        content.split(/\r?\n/).forEach((line) => {
-          const trimmed = line.trim();
-          if (trimmed && !trimmed.startsWith("#") && trimmed.includes("=")) {
-            const index = trimmed.indexOf("=");
-            const key = trimmed.substring(0, index).trim();
-            let value = trimmed.substring(index + 1).trim();
-            if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-              value = value.substring(1, value.length - 1);
-            }
-            if (key && value) {
-              process.env[key] = value;
-              loadedCount++;
-            }
-          }
-        });
-      } catch (err) {
-        console.error(`❌ Error reading ${file}:`, err);
-      }
-    }
-  });
-  if (loadedCount > 0) {
-    console.log(`✅ Loaded ${loadedCount} environment variable(s) from .env / .env.local`);
-  }
+function initDotenv() {
+  dotenv.config();
+  dotenv.config({ path: path.resolve(process.cwd(), ".env.local"), override: true });
+  dotenv.config({ path: path.resolve(process.cwd(), ".env.production"), override: true });
+  dotenv.config({ path: path.resolve(process.cwd(), ".env.development"), override: true });
 }
-loadEnvFile();
+initDotenv();
 
 const LITERT_SERVER_URL = process.env.LITERT_SERVER_URL || "http://127.0.0.1:9379";
 const MODEL_NAME = "gemma-4-e2b";
@@ -955,7 +930,7 @@ Return ONLY valid JSON with this exact structure:
 
   // Application Mode & Config Endpoint
   app.get("/api/config", (req, res) => {
-    loadEnvFile();
+    initDotenv();
     const isVercel = !!process.env.VERCEL || process.env.NODE_ENV === "production";
     const rawAppMode = (process.env.APP_MODE || "").toLowerCase();
     const appMode = isVercel || rawAppMode === "production" ? "production" : "local";
@@ -976,7 +951,7 @@ Return ONLY valid JSON with this exact structure:
   // Real-Time Model Validation Endpoint
   app.post("/api/validate-key", async (req, res) => {
     try {
-      loadEnvFile();
+      initDotenv();
       const { model } = req.body;
       const isVercel = !!process.env.VERCEL || process.env.NODE_ENV === "production";
       const rawAppMode = (process.env.APP_MODE || "").toLowerCase();
