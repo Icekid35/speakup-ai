@@ -10,7 +10,7 @@ import fs from "fs";
 import dotenv from "dotenv";
 
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 app.use(express.json({ limit: "200mb" }));
 app.use(express.urlencoded({ limit: "200mb", extended: true }));
@@ -1744,9 +1744,11 @@ Return JSON strictly:
     });
   }
 
+  // Only skip binding on Vercel (serverless functions handle HTTP differently).
+  // On Render, Railway, Fly.io, etc. — we must bind to process.env.PORT.
   if (!process.env.VERCEL) {
     app.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server listening on http://0.0.0.0:${PORT} (LiteRT-LM Gemma 4 E2B integration active)`);
+      console.log(`Server listening on http://0.0.0.0:${PORT}`);
     });
   }
 }

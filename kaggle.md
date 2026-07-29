@@ -88,7 +88,7 @@ The result feels much closer to talking with a real interviewer than chatting wi
 
 ## The Prototype
 
-**Live Demo:** https://speakup-ai-tawny.vercel.app/
+**Live Demo:** https://speakup-ai.onrender.com/
 
 **GitHub Repository:** https://github.com/Icekid35/speakup-ai
 
