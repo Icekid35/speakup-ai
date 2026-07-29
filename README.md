@@ -290,52 +290,115 @@ Below is a directory map showing where crucial features are implemented:
 
 ## 🚀 Getting Started
 
-### Prerequisites
-*   **Node.js**: v18+
-*   **Python**: Python 3.9+ (required for `faster-whisper`)
-*   **FFmpeg**: Installed on your system (`brew install ffmpeg` on macOS, or `apt install ffmpeg` on Linux)
+Follow these step-by-step instructions to run SpeakUp.ai locally on your machine.
 
-### 1. Setup Local Gemma 4
+---
 
-#### Running via LiteRT-LM (Official Google Runtime)
-1. Install LiteRT-LM on your machine.
-2. Download the model:
+### 📋 Prerequisites & System Packages
+
+Before running the application, make sure you have the following installed on your system:
+
+#### 1. Node.js (v18 or higher)
+- **macOS / Linux / Windows**: Download and install Node.js from [nodejs.org](https://nodejs.org/).
+
+#### 2. FFmpeg (Audio extraction & video frame demuxing)
+FFmpeg is required for extracting audio and visual frames from presentation videos.
+- **macOS (Homebrew)**:
+  ```bash
+  brew install ffmpeg
+  ```
+- **Linux (Ubuntu / Debian / Render)**:
+  ```bash
+  sudo apt update && sudo apt install -y ffmpeg
+  ```
+- **Windows (Chocolatey / Scoop)**:
+  ```bash
+  choco install ffmpeg
+  # OR
+  scoop install ffmpeg
+  ```
+
+#### 3. Python 3.9+ & Faster-Whisper ASR
+Faster-Whisper provides fast, local speech-to-text recognition.
+1. Create and activate a Python virtual environment inside the project directory:
+   ```bash
+   # macOS / Linux
+   python3 -m venv .venv
+   source .venv/bin/activate
+
+   # Windows (Command Prompt / PowerShell)
+   python -m venv .venv
+   .venv\Scripts\activate
+   ```
+2. Install `faster-whisper` and `edge-tts`:
+   ```bash
+   pip install --upgrade pip
+   pip install faster-whisper edge-tts
+   ```
+
+---
+
+### ⚙️ Step-by-Step Installation
+
+#### Step 1: Clone the Repository
+```bash
+git clone https://github.com/Icekid35/speakup-ai.git
+cd speakup-ai
+```
+
+#### Step 2: Install Node Dependencies
+```bash
+npm install
+```
+
+#### Step 3: Configure Environment Variables
+Create a `.env` file in the root directory (or copy from `.env.example`):
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and set your desired mode and API keys:
+```env
+# Application Mode: 'local' (on-device LiteRT) or 'production' (Cloud API)
+NEXT_PUBLIC_APP_MODE=local
+
+# Google Cloud Gemini API Key (get a free key at https://aistudio.google.com/)
+NEXT_PUBLIC_GEMINI_API_KEY=your_gemini_api_key_here
+NEXT_PUBLIC_GEMINI_MODEL=gemma-4-31b-it
+
+# Optional: Groq Whisper API for sub-second, zero-RAM cloud speech transcription
+# (Get a free key at https://console.groq.com/keys)
+NEXT_PUBLIC_GROQ_API_KEY=your_groq_api_key_here
+```
+
+---
+
+### 🤖 Running Local Gemma 4 (Optional — for Offline On-Device Mode)
+
+If you want to run **Google Gemma 4** completely offline on your device:
+
+1. Install **LiteRT-LM** (Official Google Runtime):
+   ```bash
+   pip install litert-lm
+   ```
+2. Download the Gemma 4 E2B model:
    ```bash
    litert-lm download google/gemma-4-e2b
    ```
-3. Start the server on port `9379`:
+3. Start the local inference server on port `9379`:
    ```bash
    litert-lm serve --model google/gemma-4-e2b --port 9379
    ```
 
 ---
 
-### 2. Install Python ASR dependencies
+### 💻 Launching the Application
+
+Start the local server and dev environment:
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install faster-whisper
-```
-
-### 3. Configure Environment variables
-Create a `.env` file in the root of the project:
-```env
-# Mode: 'local' (uses LiteRT/Ollama) or 'production' (requires Cloud API credentials)
-APP_MODE=local
-
-# Local server endpoint
-LITERT_SERVER_URL=http://127.0.0.1:9379
-
-# (Optional) If switching to Cloud API mode:
-# GEMINI_API_KEY=your_google_cloud_gemini_api_key
-# GEMINI_MODEL=gemma-4-31b-it
-```
-
-### 4. Install Node dependencies & Run
-```bash
-npm install
 npm run dev
 ```
+
 Open **`http://localhost:3000`** in your browser.
 
 ---
