@@ -95,7 +95,6 @@ export const analyzeVideo = async (
   // If base64 string exceeds 2.5 MB (2,500,000 chars), extract compressed client JPEG frames (~100KB)
   // to avoid Vercel HTTP 413 (Content Too Large) errors.
   if (videoBase64.length > 2500000) {
-    console.log(`📹 Video payload size (${Math.round(videoBase64.length / 1024)}KB) exceeds Vercel 3MB limit. Extracting compressed client frames...`);
     framesBase64 = await extractVideoFramesClient(blob, 5);
     videoBase64 = ""; // Omit large video base64 string so HTTP payload stays < 300KB
   }
