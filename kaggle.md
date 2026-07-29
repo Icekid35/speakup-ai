@@ -1,4 +1,4 @@
-## 💡 Inspiration
+## Inspiration
 
 > **The gap between "I know my material" and "I can deliver it with confidence" changes lives.**
 
@@ -18,7 +18,7 @@ Our goal is simple:
 
 ---
 
-# 🔧 How We Built It
+## How We Built It
 
 ### Google Gemma 4 at the Core
 
@@ -46,7 +46,7 @@ When a user uploads a presentation, SpeakUp.ai performs a complete multimodal an
 4. Gemma evaluates the presentation as one complete speech, analyzing confidence, pacing, posture, eye contact, body language, and communication style.
 5. Finally, SpeakUp.ai generates an improved presentation script, personalized coaching, performance scores, and spoken feedback.
 
-Instead of reviewing isolated clips, the AI understands the presentation as a complete story—making the feedback feel much more like a real communication coach.
+Instead of reviewing isolated clips, the AI understands the presentation as a complete story, making the feedback feel much more like a real communication coach.
 
 ---
 
@@ -86,15 +86,15 @@ The result feels much closer to talking with a real interviewer than chatting wi
 
 ---
 
-## 🎯 The Prototype
+## The Prototype
 
-🌐 **Live Demo:** https://speakup-ai-tawny.vercel.app/
+**Live Demo:** https://speakup-ai-tawny.vercel.app/
 
-💻 **GitHub Repository:** https://github.com/Icekid35/speakup-ai
+**GitHub Repository:** https://github.com/Icekid35/speakup-ai
 
 ---
 
-## 😤 Challenges We Ran Into
+## Challenges We Ran Into
 
 Building SpeakUp.ai pushed us to solve problems across speech recognition, multimodal reasoning, local AI, and real-time interaction.
 
@@ -126,7 +126,7 @@ To make our AI examiner feel realistic, we designed it to remember previous answ
 
 ---
 
-## 🌍 Why This Matters
+## Why This Matters
 
 Communication is one of the few skills that every student, graduate, entrepreneur, researcher, and professional depends on.
 

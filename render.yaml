@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: speakup-ai
+    runtime: node
+    region: oregon
+
+    # Build command: install ffmpeg + faster-whisper + npm deps + vite build
+    buildCommand: bash build.sh
+
+    # Start command: run the compiled Express server
+    startCommand: node dist/server.cjs
+
+    # Node version
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+
+      # App mode — tells the server this is production (cloud)
+      - key: NEXT_PUBLIC_APP_MODE
+        value: production
+
+      # Set your Gemini API key in the Render dashboard environment variables
+      # - key: NEXT_PUBLIC_GEMINI_API_KEY
+      #   value: YOUR_KEY_HERE
+      # - key: NEXT_PUBLIC_GEMINI_MODEL
+      #   value: gemma-4-31b-it
+
+    # Health check path
+    healthCheckPath: /api/health
+
+    # Auto-deploy on every git push
+    autoDeploy: true

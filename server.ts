@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import { GoogleGenAI } from "@google/genai";
 import { exec } from "child_process";
+import { execSync, spawnSync } from "child_process";
 import { promisify } from "util";
 const execAsync = promisify(exec);
 
@@ -61,6 +62,36 @@ function getAppMode(): 'local' | 'production' {
   if (raw === "production") return 'production';
   return 'local';
 }
+
+/**
+ * Runtime capability probe — detects whether ffmpeg and faster-whisper
+ * are actually available on this machine/server.
+ * On Render (after build.sh installs them) this returns true.
+ * On Vercel (serverless, read-only) this returns false.
+ */
+const localToolsAvailable: { ffmpeg: boolean; whisper: boolean } = (() => {
+  let ffmpegOk = false;
+  let whisperOk = false;
+  try {
+    execSync(`${(() => {
+      const candidates = ["/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg", "/usr/bin/ffmpeg", "ffmpeg"];
+      for (const c of candidates) { try { execSync(`${c} -version`, { stdio: "ignore", timeout: 3000 }); return c; } catch {} } return "ffmpeg";
+    })()} -version`, { stdio: "ignore", timeout: 3000 });
+    ffmpegOk = true;
+  } catch {}
+  try {
+    const pyBins = [".venv/bin/python3", "python3", "python"];
+    for (const py of pyBins) {
+      try {
+        execSync(`${py} -c "import faster_whisper"`, { stdio: "ignore", timeout: 5000 });
+        whisperOk = true;
+        break;
+      } catch {}
+    }
+  } catch {}
+  console.log(`🔍 Tool probe: ffmpeg=${ffmpegOk}, faster-whisper=${whisperOk}`);
+  return { ffmpeg: ffmpegOk, whisper: whisperOk };
+})();
 
 const LITERT_SERVER_URL = getEnvVar("LITERT_SERVER_URL", "http://127.0.0.1:9379");
 const MODEL_NAME = "gemma-4-e2b";
@@ -261,7 +292,7 @@ function cleanAndParseJSON<T = any>(text: string, fallback?: T): T {
   }
 }
 
-import { execSync, spawnSync } from "child_process";
+
 
 const EDGE_TTS_BIN = path.join(process.cwd(), ".venv/bin/edge-tts");
 
@@ -428,14 +459,12 @@ function generatePCMBase64(text: string): string {
 
 /**
  * Extract audio from video and run Faster-Whisper ASR for 100% real speech transcription.
- * On Vercel/production (no .venv or Homebrew), this is skipped gracefully.
+ * Runs on: local dev (macOS) + Render.com (after build.sh installs faster-whisper)
+ * Skips on: Vercel (no Python runtime available)
  */
 async function extractWhisperTranscript(videoPath: string): Promise<string> {
-  const appMode = getAppMode();
-
-  // Skip on Vercel/production — no .venv, no Homebrew, no Faster-Whisper available
-  if (appMode === "production") {
-    console.log("☁️ Production mode: skipping local Faster-Whisper ASR (unavailable on Vercel)");
+  if (!localToolsAvailable.whisper || !localToolsAvailable.ffmpeg) {
+    console.log("⏭️ Skipping Faster-Whisper ASR — tools not available on this host");
     return "";
   }
 
@@ -495,12 +524,8 @@ print(full_text)
  * Extract key video frames and analyze visual posture/eye contact via configured AI model
  */
 async function extractVisionObservation(videoPath: string, totalDur: number, userModel?: string): Promise<string> {
-  const appMode = getAppMode();
-
-  // Skip frame extraction in production — no Homebrew ffmpeg on Vercel Linux.
-  // The /api/analyze handler uses client-side framesBase64 for vision in production.
-  if (appMode === "production") {
-    console.log("☁️ Production mode: skipping local FFmpeg frame extraction for vision");
+  if (!localToolsAvailable.ffmpeg) {
+    console.log("⏭️ Skipping FFmpeg frame extraction — ffmpeg not available on this host");
     return "";
   }
 
