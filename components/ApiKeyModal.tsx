@@ -59,7 +59,10 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
   const isLocalSelectedInProduction = appMode === 'production' && model === 'gemma-4-e2b';
 
   const handleSave = async () => {
-    if (isLocalSelectedInProduction) return;
+    if (isLocalSelectedInProduction) {
+      setErrorMsg('Local Gemma 4 E2B is unavailable in production mode. Please select a cloud Gemma model.');
+      return;
+    }
     if (!model) {
       setErrorMsg('Please select an AI model before proceeding.');
       return;
@@ -69,17 +72,29 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
     setErrorMsg(null);
 
     try {
-      localStorage.setItem('speakup_gemini_model', model);
-      localStorage.setItem('aura_gemini_model', model);
+      const res = await fetch('/api/validate-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model })
+      });
 
-      window.dispatchEvent(new CustomEvent('speakup_model_changed', { detail: { model } }));
-      window.dispatchEvent(new CustomEvent('aura_model_changed', { detail: { model } }));
+      const data = await res.json();
 
-      setSaved(true);
-      onKeySaved();
-      setTimeout(() => { onClose(); }, 600);
+      if (res.ok && data.valid) {
+        localStorage.setItem('speakup_gemini_model', model);
+        localStorage.setItem('aura_gemini_model', model);
+
+        window.dispatchEvent(new CustomEvent('speakup_model_changed', { detail: { model } }));
+        window.dispatchEvent(new CustomEvent('aura_model_changed', { detail: { model } }));
+
+        setSaved(true);
+        onKeySaved();
+        setTimeout(() => { onClose(); }, 600);
+      } else {
+        setErrorMsg(data.error || 'Model verification failed.');
+      }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to save model configuration.');
+      setErrorMsg(err.message || 'Failed to communicate with verification server.');
     } finally {
       setIsValidating(false);
     }

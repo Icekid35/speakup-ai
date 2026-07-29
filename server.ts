@@ -940,36 +940,49 @@ Return ONLY valid JSON with this exact structure:
   // Application Mode & Config Endpoint
   app.get("/api/config", (req, res) => {
     loadEnvFile();
-    const appMode = (process.env.APP_MODE || "local").toLowerCase();
-    const envApiKey = process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim() !== "PLACEHOLDER_API_KEY" ? process.env.GEMINI_API_KEY.trim() : null;
-    const envModel = process.env.GEMINI_MODEL ? process.env.GEMINI_MODEL.trim() : null;
+    const isVercel = !!process.env.VERCEL || process.env.NODE_ENV === "production";
+    const rawAppMode = (process.env.APP_MODE || "").toLowerCase();
+    const appMode = isVercel || rawAppMode === "production" ? "production" : "local";
+
+    const envApiKey = process.env.GEMINI_API_KEY || "AIzaSyBmFCdPByjcikR5yaGoX4FSzDys-N1_bss";
+    const envModel = process.env.GEMINI_MODEL || "gemma-4-31b-it";
 
     res.json({
       appMode, // 'local' | 'production'
       isProduction: appMode === "production",
-      defaultModel: appMode === "production" ? (envModel || null) : "gemma-4-e2b",
-      hasEnvApiKey: !!envApiKey,
-      envApiKey: envApiKey || null,
-      envModel: envModel || null
+      defaultModel: appMode === "production" ? envModel : "gemma-4-e2b",
+      hasEnvApiKey: true,
+      envApiKey: envApiKey,
+      envModel: envModel
     });
   });
 
-  // Real-Time API Key & Model Validation Endpoint
+  // Real-Time Model Validation Endpoint
   app.post("/api/validate-key", async (req, res) => {
     try {
-      const { apiKey, model } = req.body;
+      loadEnvFile();
+      const { model } = req.body;
+      const isVercel = !!process.env.VERCEL || process.env.NODE_ENV === "production";
+      const rawAppMode = (process.env.APP_MODE || "").toLowerCase();
+      const appMode = isVercel || rawAppMode === "production" ? "production" : "local";
 
       if (!model) {
         return res.status(400).json({ valid: false, error: "Please select an AI model first." });
       }
 
       if (model === "gemma-4-e2b") {
+        if (appMode === "production") {
+          return res.status(400).json({
+            valid: false,
+            error: "Local Gemma 4 E2B is unavailable in production mode. Please select a cloud Gemma model."
+          });
+        }
         // Validate local LiteRT server availability
         try {
           const testRes = await fetch(`${LITERT_SERVER_URL}/v1/chat/completions`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            signal: AbortSignal.timeout(5000),
+            signal: AbortSignal.timeout(4000),
             body: JSON.stringify({
               model: "gemma-4-e2b",
               messages: [{ role: "user", content: "hi" }],
@@ -979,7 +992,7 @@ Return ONLY valid JSON with this exact structure:
           if (testRes.ok) {
             return res.json({ valid: true, model: "gemma-4-e2b", message: "Local Gemma 4 E2B server active." });
           } else {
-            return res.status(400).json({ valid: false, error: "Local Gemma 4 E2B server returned an error response." });
+            return res.status(400).json({ valid: false, error: "Local Gemma 4 E2B server returned an error." });
           }
         } catch (err: any) {
           return res.status(400).json({ valid: false, error: "Local Gemma 4 E2B server is offline or unreachable at http://127.0.0.1:9379" });
@@ -987,10 +1000,7 @@ Return ONLY valid JSON with this exact structure:
       }
 
       // Cloud Model Validation via real ping request to Google Gemini API
-      const effectiveKey = (apiKey && apiKey.trim()) || process.env.GEMINI_API_KEY;
-      if (!effectiveKey || !effectiveKey.trim()) {
-        return res.status(400).json({ valid: false, error: "API key is required for cloud models." });
-      }
+      const effectiveKey = (req.body.apiKey && req.body.apiKey.trim()) || process.env.GEMINI_API_KEY || "AIzaSyBmFCdPByjcikR5yaGoX4FSzDys-N1_bss";
 
       const ai = new GoogleGenAI({ apiKey: effectiveKey.trim() });
       const response = await ai.models.generateContent({
@@ -999,15 +1009,15 @@ Return ONLY valid JSON with this exact structure:
       });
 
       if (response && response.text !== undefined) {
-        return res.json({ valid: true, model, message: "API key validated successfully!" });
+        return res.json({ valid: true, model, message: "Model verified successfully!" });
       } else {
-        return res.status(400).json({ valid: false, error: "Model returned an empty response. Check API key permissions." });
+        return res.status(400).json({ valid: false, error: "Model returned an empty response. Verify model availability." });
       }
     } catch (err: any) {
       console.error("❌ Key Validation Error:", err.message);
-      let userFriendlyMsg = err.message || "Invalid API key or model request failed.";
-      if (userFriendlyMsg.includes("API_KEY_INVALID") || userFriendlyMsg.includes("400") || userFriendlyMsg.includes("401") || userFriendlyMsg.includes("403") || userFriendlyMsg.includes("API key not valid")) {
-        userFriendlyMsg = "Invalid API Key. Please verify your credentials and try again.";
+      let userFriendlyMsg = err.message || "Model verification failed.";
+      if (userFriendlyMsg.includes("API_KEY_INVALID") || userFriendlyMsg.includes("400") || userFriendlyMsg.includes("401") || userFriendlyMsg.includes("403")) {
+        userFriendlyMsg = "API key or model request failed. Please select a valid Gemma model.";
       }
       return res.status(400).json({ valid: false, error: userFriendlyMsg });
     }
