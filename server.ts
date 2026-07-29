@@ -37,6 +37,17 @@ function getEnvVar(key: string, fallback: string = ""): string {
   return process.env[`NEXT_PUBLIC_${key}`] || process.env[key] || fallback;
 }
 
+/**
+ * Universal App Mode Resolver
+ * Returns 'production' on Vercel or when APP_MODE=production in .env
+ */
+function getAppMode(): 'local' | 'production' {
+  if (process.env.VERCEL) return 'production';
+  const raw = (getEnvVar("APP_MODE") || "").toLowerCase();
+  if (raw === "production") return 'production';
+  return 'local';
+}
+
 const LITERT_SERVER_URL = getEnvVar("LITERT_SERVER_URL", "http://127.0.0.1:9379");
 const MODEL_NAME = "gemma-4-e2b";
 
@@ -92,18 +103,18 @@ async function queryAI(
 ): Promise<string> {
   loadEnvFile();
   const apiKey = getEnvVar("GEMINI_API_KEY");
-  const appMode = (getEnvVar("APP_MODE") || (process.env.VERCEL ? "production" : "local")).toLowerCase();
+  const appMode = getAppMode();
   
   // ALWAYS honor options?.userModel if passed! Fallback to env GEMINI_MODEL or gemma-4-31b-it.
   let targetModel = options?.userModel || getEnvVar("GEMINI_MODEL", "gemma-4-31b-it");
 
-  // In production mode (or on Vercel), if userModel is 'gemma-4-e2b' (which needs local server), switch to cloud model
-  if ((appMode === "production" || process.env.VERCEL) && targetModel === "gemma-4-e2b") {
+  // In production mode (on Vercel), if userModel is 'gemma-4-e2b' (which needs local server), switch to cloud model
+  if (appMode === "production" && targetModel === "gemma-4-e2b") {
     targetModel = getEnvVar("GEMINI_MODEL", "gemma-4-31b-it");
   }
 
   // Cloud Gemini / Gemma API route
-  if (targetModel !== "gemma-4-e2b" || appMode === "production" || process.env.VERCEL) {
+  if (targetModel !== "gemma-4-e2b" || appMode === "production") {
     const cloudModel = (targetModel === "gemma-4-e2b") ? getEnvVar("GEMINI_MODEL", "gemma-4-31b-it") : targetModel;
     if (!apiKey || !apiKey.trim()) {
       throw new Error("NEXT_PUBLIC_GEMINI_API_KEY or GEMINI_API_KEY is not configured in your .env / .env.local file.");
@@ -986,10 +997,7 @@ Return ONLY valid JSON with this exact structure:
   // Application Mode & Config Endpoint
   app.get("/api/config", (req, res) => {
     loadEnvFile();
-    const isVercel = !!process.env.VERCEL || process.env.NODE_ENV === "production";
-    const rawAppMode = (getEnvVar("APP_MODE") || "").toLowerCase();
-    const appMode = isVercel || rawAppMode === "production" ? "production" : "local";
-
+    const appMode = getAppMode();
     const envApiKey = getEnvVar("GEMINI_API_KEY");
     const envModel = getEnvVar("GEMINI_MODEL", "gemma-4-31b-it");
 
@@ -1008,9 +1016,7 @@ Return ONLY valid JSON with this exact structure:
     try {
       loadEnvFile();
       const { model } = req.body;
-      const isVercel = !!process.env.VERCEL || process.env.NODE_ENV === "production";
-      const rawAppMode = (getEnvVar("APP_MODE") || "").toLowerCase();
-      const appMode = isVercel || rawAppMode === "production" ? "production" : "local";
+      const appMode = getAppMode();
 
       if (!model) {
         return res.status(400).json({ valid: false, error: "Please select an AI model first." });
