@@ -13,6 +13,11 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
   });
 };
 
+const getUserModel = (): string | undefined => {
+  if (typeof window === 'undefined') return undefined;
+  return localStorage.getItem('speakup_gemini_model') || localStorage.getItem('aura_gemini_model') || undefined;
+};
+
 export const analyzeVideo = async (
   blob: Blob,
   mode: 'full' | 'drill' = 'full',
@@ -21,9 +26,6 @@ export const analyzeVideo = async (
 ): Promise<SpeakUpAnalysis> => {
   const dur = videoDuration && videoDuration > 0 ? Math.round(videoDuration) : 60;
   const videoBase64 = await blobToBase64(blob);
-
-  const userApiKey = typeof window !== 'undefined' ? (localStorage.getItem('speakup_gemini_api_key') || localStorage.getItem('aura_gemini_api_key')) : null;
-  const userModel = typeof window !== 'undefined' ? (localStorage.getItem('speakup_gemini_model') || localStorage.getItem('aura_gemini_model')) : null;
 
   const res = await fetch("/api/analyze", {
     method: "POST",
@@ -34,8 +36,7 @@ export const analyzeVideo = async (
       mode,
       context,
       videoDuration: dur,
-      userApiKey: userApiKey || undefined,
-      userModel: userModel || undefined,
+      userModel: getUserModel(),
     }),
   });
 
@@ -47,13 +48,15 @@ export const analyzeVideo = async (
   return await res.json();
 };
 
-
 export const generateDebriefScript = async (analysis: SpeakUpAnalysis): Promise<string> => {
   try {
     const res = await fetch("/api/debrief-script", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ analysis }),
+      body: JSON.stringify({
+        analysis,
+        userModel: getUserModel(),
+      }),
     });
 
     if (!res.ok) {
@@ -89,7 +92,13 @@ export const fetchInterviewStep = async (
   const res = await fetch("/api/interview-step", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ role, companyTier, history, lastUserTranscript }),
+    body: JSON.stringify({
+      role,
+      companyTier,
+      history,
+      lastUserTranscript,
+      userModel: getUserModel(),
+    }),
   });
   if (!res.ok) {
     throw new Error("Failed to process interview turn");
@@ -112,13 +121,15 @@ export const fetchInterviewSummary = async (
   companyTier: string,
   history: any[]
 ): Promise<InterviewSummaryResponse> => {
-  const userApiKey = typeof window !== 'undefined' ? (localStorage.getItem('speakup_gemini_api_key') || localStorage.getItem('aura_gemini_api_key')) : null;
-  const userModel = typeof window !== 'undefined' ? (localStorage.getItem('speakup_gemini_model') || localStorage.getItem('aura_gemini_model')) : null;
-
   const res = await fetch("/api/interview-summary", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ role, companyTier, history, userApiKey: userApiKey || undefined, userModel: userModel || undefined }),
+    body: JSON.stringify({
+      role,
+      companyTier,
+      history,
+      userModel: getUserModel(),
+    }),
   });
   if (!res.ok) {
     throw new Error("Failed to generate interview summary");
@@ -142,7 +153,13 @@ export const fetchCoachIntervention = async (
   const res = await fetch("/api/coach-intervene", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ triggerReason, recentTranscript, fillerCount, wpm }),
+    body: JSON.stringify({
+      triggerReason,
+      recentTranscript,
+      fillerCount,
+      wpm,
+      userModel: getUserModel(),
+    }),
   });
   if (!res.ok) {
     throw new Error("Failed to generate coach intervention");
@@ -167,21 +184,13 @@ export const fetchScriptDoctor = async (
   rawScript: string,
   targetAudience: string
 ): Promise<ScriptDoctorResponse> => {
-  const userApiKey = typeof window !== 'undefined'
-    ? (localStorage.getItem('speakup_gemini_api_key') || localStorage.getItem('aura_gemini_api_key'))
-    : null;
-  const userModel = typeof window !== 'undefined'
-    ? (localStorage.getItem('speakup_gemini_model') || localStorage.getItem('aura_gemini_model'))
-    : null;
-
   const res = await fetch("/api/script-doctor", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       rawScript,
       targetAudience,
-      userApiKey: userApiKey || undefined,
-      userModel: userModel || undefined,
+      userModel: getUserModel(),
     }),
   });
   if (!res.ok) {
@@ -213,7 +222,10 @@ export const getRealtimeFeedback = async (
     const res = await fetch("/api/realtime-feedback", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(metrics),
+      body: JSON.stringify({
+        ...metrics,
+        userModel: getUserModel(),
+      }),
     });
 
     if (!res.ok) {

@@ -100,7 +100,7 @@ async function queryAI(
       targetModel = getEnvVar("GEMINI_MODEL", "gemma-4-31b-it");
     }
   } else {
-    targetModel = targetModel || "gemma-4-e2b";
+    targetModel = targetModel || getEnvVar("GEMINI_MODEL", "gemma-4-31b-it");
   }
 
   // Cloud Gemini / Gemma API route
