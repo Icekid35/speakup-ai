@@ -458,67 +458,130 @@ function generatePCMBase64(text: string): string {
 }
 
 /**
- * Extract audio from video and run Faster-Whisper ASR for 100% real speech transcription.
- * Runs on: local dev (macOS) + Render.com (after build.sh installs faster-whisper)
- * Skips on: Vercel (no Python runtime available)
+ * Extract audio from video and run Speech-to-Text ASR for 100% real speech transcription.
+ * Fallback order:
+ * 1. Local Faster-Whisper (if python & faster-whisper are installed)
+ * 2. Cloud Groq Whisper API (if GROQ_API_KEY is configured — sub-second, zero RAM)
+ * 3. Cloud Gemini Audio ASR (using GEMINI_API_KEY — native audio transcription)
  */
-async function extractWhisperTranscript(videoPath: string): Promise<string> {
-  if (!localToolsAvailable.whisper || !localToolsAvailable.ffmpeg) {
-    console.log("⏭️ Skipping Faster-Whisper ASR — tools not available on this host");
-    return "";
-  }
-
+async function extractWhisperTranscript(videoPath: string, userModel?: string): Promise<string> {
   const id = `${Date.now()}_${Math.floor(Math.random() * 10000)}`;
   const tmpWav = path.join(process.cwd(), `.tmp_whisper_${id}.wav`);
+
   try {
-    // Extract clean 16kHz mono PCM audio for Whisper ASR
-    await execAsync(`${FFMPEG_BIN} -y -i "${videoPath}" -vn -ar 16000 -ac 1 "${tmpWav}"`);
+    // Extract clean 16kHz mono PCM audio for Whisper ASR if ffmpeg is available
+    if (localToolsAvailable.ffmpeg) {
+      try {
+        await execAsync(`${FFMPEG_BIN} -y -i "${videoPath}" -vn -ar 16000 -ac 1 "${tmpWav}"`);
+      } catch (e: any) {
+        console.warn("⚠️ Audio extraction warning:", e.message);
+      }
+    }
 
-    if (!fs.existsSync(tmpWav)) return "";
+    const wavExists = fs.existsSync(tmpWav);
 
-    // Run Faster-Whisper with the smallest models to fit Render free tier (512MB RAM limit).
-    // Model RAM usage: tiny.en ~75MB, base.en ~150MB, small.en ~500MB (OOM on free tier)
-    // int8 compute_type halves memory usage vs float32.
-    const pyScript = `
+    // 1. Local Faster-Whisper (if available)
+    if (localToolsAvailable.whisper && wavExists) {
+      try {
+        const pyScript = `
 import sys
 from faster_whisper import WhisperModel
 try:
-    # tiny.en: 39MB weights, ~75MB peak RAM — fits comfortably in 512MB
     model = WhisperModel('tiny.en', device='cpu', compute_type='int8', cpu_threads=2)
+    segments, info = model.transcribe('${tmpWav}', beam_size=1, language='en')
+    full_text = ' '.join([s.text.strip() for s in segments if s.text])
+    print(full_text)
+    del model
 except Exception:
-    try:
-        model = WhisperModel('tiny', device='cpu', compute_type='int8', cpu_threads=2)
-    except Exception as e:
-        print('', end='')
-        sys.exit(0)
-
-segments, info = model.transcribe('${tmpWav}', beam_size=1, language='en')
-full_text = ' '.join([s.text.strip() for s in segments if s.text])
-print(full_text)
-del model
+    sys.exit(0)
 `;
-    const pyPath = path.join(process.cwd(), `.tmp_py_${id}.py`);
-    fs.writeFileSync(pyPath, pyScript);
+        const pyPath = path.join(process.cwd(), `.tmp_py_${id}.py`);
+        fs.writeFileSync(pyPath, pyScript);
 
-    // Try multiple python3 resolution paths for local dev
-    let pyOut = "";
-    const pyBins = [".venv/bin/python3", "python3", "python"];
-    for (const pyBin of pyBins) {
-      try {
-        const result = await execAsync(`${pyBin} "${pyPath}"`, { timeout: 90000 });
-        pyOut = result.stdout;
-        break;
-      } catch (pyErr: any) {
-        if (pyBin === pyBins[pyBins.length - 1]) throw pyErr;
+        let pyOut = "";
+        const pyBins = [".venv/bin/python3", "python3", "python"];
+        for (const pyBin of pyBins) {
+          try {
+            const result = await execAsync(`${pyBin} "${pyPath}"`, { timeout: 30000 });
+            pyOut = result.stdout;
+            break;
+          } catch {}
+        }
+        if (fs.existsSync(pyPath)) try { fs.unlinkSync(pyPath); } catch {}
+
+        const transcript = pyOut.trim();
+        if (transcript) {
+          console.log("🎙️ REAL WHISPER TRANSCRIPT (Local ASR):", transcript);
+          return transcript;
+        }
+      } catch (err: any) {
+        console.warn("⚠️ Local Faster-Whisper failed, attempting cloud fallbacks:", err.message);
       }
     }
-    try { fs.unlinkSync(pyPath); } catch {}
 
-    const transcript = pyOut.trim();
-    console.log("🎙️ REAL WHISPER TRANSCRIPT:", transcript || "(Silence detected)");
-    return transcript;
+    // 2. Cloud Groq Whisper API (if GROQ_API_KEY is configured)
+    const groqApiKey = getEnvVar("GROQ_API_KEY");
+    if (groqApiKey && wavExists) {
+      try {
+        console.log("🎙️ Attempting Cloud Groq Whisper API transcription...");
+        const audioBuffer = fs.readFileSync(tmpWav);
+        const fileBlob = new Blob([audioBuffer], { type: "audio/wav" });
+        const formData = new FormData();
+        formData.append("file", fileBlob, "speech.wav");
+        formData.append("model", "whisper-large-v3-turbo");
+
+        const groqRes = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${groqApiKey.trim()}` },
+          body: formData,
+        });
+
+        if (groqRes.ok) {
+          const data = await groqRes.json();
+          if (data.text && data.text.trim()) {
+            console.log("🎙️ REAL WHISPER TRANSCRIPT (Groq Cloud API):", data.text.trim());
+            return data.text.trim();
+          }
+        } else {
+          console.warn("⚠️ Groq API status:", groqRes.status);
+        }
+      } catch (gErr: any) {
+        console.warn("⚠️ Groq Whisper API error:", gErr.message);
+      }
+    }
+
+    // 3. Cloud Gemini Native Audio ASR (using GEMINI_API_KEY)
+    loadEnvFile();
+    const geminiApiKey = getEnvVar("GEMINI_API_KEY");
+    if (geminiApiKey && wavExists) {
+      try {
+        console.log("🎙️ Attempting Cloud Gemini Native Audio ASR...");
+        const ai = new GoogleGenAI({ apiKey: geminiApiKey.trim() });
+        const audioB64 = fs.readFileSync(tmpWav).toString("base64");
+        const targetModel = userModel || getEnvVar("GEMINI_MODEL", "gemma-4-31b-it");
+        const cloudModel = targetModel === "gemma-4-e2b" ? getEnvVar("GEMINI_MODEL", "gemma-4-31b-it") : targetModel;
+
+        const response = await ai.models.generateContent({
+          model: cloudModel,
+          contents: [
+            { inlineData: { mimeType: "audio/wav", data: audioB64 } },
+            "Provide an exact, word-for-word transcript of everything spoken in this audio file. Return ONLY the spoken transcript text with no extra comments or labels."
+          ]
+        });
+
+        if (response && response.text && response.text.trim()) {
+          const text = response.text.trim();
+          console.log("🎙️ REAL SPEECH TRANSCRIPT (Gemini Audio ASR):", text);
+          return text;
+        }
+      } catch (cErr: any) {
+        console.warn("⚠️ Cloud Gemini Audio ASR failed:", cErr.message);
+      }
+    }
+
+    return "";
   } catch (err: any) {
-    console.warn("⚠️ Faster-Whisper extraction failed:", err.message);
+    console.warn("⚠️ Speech transcription pipeline failed:", err.message);
     return "";
   } finally {
     if (fs.existsSync(tmpWav)) try { fs.unlinkSync(tmpWav); } catch {}
@@ -933,7 +996,7 @@ async function analyzeWithGeminiCloud(
     // Handle Gemma 4 models (which take image/text vision inputs, not raw video audio streams)
     if (modelName.toLowerCase().includes("gemma")) {
       console.log(`☁️ Cloud Gemma Model (${modelName}) active. Extracting Whisper speech & vision frames...`);
-      const realSpeech = await extractWhisperTranscript(tmpVid);
+      const realSpeech = await extractWhisperTranscript(tmpVid, modelName);
       
       const timestamps = [
         Math.max(1, Math.round(totalDur * 0.15)),
@@ -1194,8 +1257,8 @@ Return ONLY valid JSON with this exact structure:
         try {
           fs.writeFileSync(tmpVid, Buffer.from(videoBase64, 'base64'));
 
-          // 1. Extract 100% real speech transcript using Faster-Whisper ASR
-          const wText = await extractWhisperTranscript(tmpVid);
+          // 1. Extract 100% real speech transcript using Faster-Whisper ASR / Cloud ASR
+          const wText = await extractWhisperTranscript(tmpVid, userModel);
           if (wText) realTranscript = wText;
 
           // 2. Extract real visual evaluation using the user-selected AI model
