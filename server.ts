@@ -250,7 +250,26 @@ function cleanAndParseJSON<T = any>(text: string, fallback?: T): T {
 import { execSync, spawnSync } from "child_process";
 
 const EDGE_TTS_BIN = path.join(process.cwd(), ".venv/bin/edge-tts");
-const FFMPEG_BIN = "/opt/homebrew/bin/ffmpeg";
+
+/**
+ * Resolve ffmpeg binary — works on macOS Homebrew and Linux (Vercel/Ubuntu)
+ */
+function resolveFfmpeg(): string {
+  const candidates = [
+    "/opt/homebrew/bin/ffmpeg",  // macOS Homebrew (Apple Silicon)
+    "/usr/local/bin/ffmpeg",      // macOS Homebrew (Intel)
+    "/usr/bin/ffmpeg",            // Linux (Ubuntu/Debian)
+    "ffmpeg",                     // PATH fallback
+  ];
+  for (const bin of candidates) {
+    try {
+      execSync(`${bin} -version`, { stdio: "ignore", timeout: 3000 });
+      return bin;
+    } catch {}
+  }
+  return "ffmpeg"; // last resort PATH
+}
+const FFMPEG_BIN = resolveFfmpeg();
 
 /**
  * Microsoft Edge Neural TTS — genuinely human-sounding voices.
@@ -323,57 +342,61 @@ async function generateNeuralSpeech(text: string): Promise<string> {
   return "";
 }
 
-// Sync wrapper used by existing endpoints
+// Sync wrapper used by existing endpoints — production-safe (no local CLI dependencies)
 function generatePCMBase64(text: string): string {
-  // edge-tts is async — fire it synchronously via spawnSync
   const id = `${Date.now()}_${Math.floor(Math.random() * 10000)}`;
-  const tmpMp3 = path.join(process.cwd(), `.tmp_speech_${id}.mp3`);
-  const tmpWav = path.join(process.cwd(), `.tmp_speech_${id}.wav`);
   const cleanText = text.replace(/"/g, "'").replace(/\n/g, " ").trim();
+  const appMode = getAppMode();
 
-  const neuralVoices = [
-    "en-US-AndrewMultilingualNeural",
-    "en-US-BrianMultilingualNeural",
-    "en-US-SteffanNeural",
-  ];
+  // In local mode only — try edge-tts (needs local .venv) and macOS say
+  if (appMode === "local") {
+    const tmpMp3 = path.join(process.cwd(), `.tmp_speech_${id}.mp3`);
+    const tmpWav = path.join(process.cwd(), `.tmp_speech_${id}.wav`);
 
-  for (const voice of neuralVoices) {
-    try {
-      const r = spawnSync(EDGE_TTS_BIN, ["--voice", voice, "--text", cleanText, "--write-media", tmpMp3], { timeout: 20000 });
-      if (r.status === 0 && fs.existsSync(tmpMp3)) {
-        const c = spawnSync(FFMPEG_BIN, ["-y", "-i", tmpMp3, "-ar", "24000", "-ac", "1", tmpWav], { timeout: 10000 });
-        try { fs.unlinkSync(tmpMp3); } catch {}
-        if (c.status === 0 && fs.existsSync(tmpWav)) {
-          const buf = fs.readFileSync(tmpWav);
-          try { fs.unlinkSync(tmpWav); } catch {}
-          console.log(`🎙️ Neural TTS (sync): ${voice}`);
-          return buf.toString("base64");
+    const neuralVoices = [
+      "en-US-AndrewMultilingualNeural",
+      "en-US-BrianMultilingualNeural",
+      "en-US-SteffanNeural",
+    ];
+
+    for (const voice of neuralVoices) {
+      try {
+        const r = spawnSync(EDGE_TTS_BIN, ["--voice", voice, "--text", cleanText, "--write-media", tmpMp3], { timeout: 20000 });
+        if (r.status === 0 && fs.existsSync(tmpMp3)) {
+          const c = spawnSync(FFMPEG_BIN, ["-y", "-i", tmpMp3, "-ar", "24000", "-ac", "1", tmpWav], { timeout: 10000 });
+          try { fs.unlinkSync(tmpMp3); } catch {}
+          if (c.status === 0 && fs.existsSync(tmpWav)) {
+            const buf = fs.readFileSync(tmpWav);
+            try { fs.unlinkSync(tmpWav); } catch {}
+            console.log(`🎙️ Neural TTS (sync): ${voice}`);
+            return buf.toString("base64");
+          }
         }
+      } catch { /* try next */ }
+    }
+
+    // Fallback to macOS say (local development only)
+    try {
+      const id2 = `${Date.now()}_fb`;
+      const fa = path.join(process.cwd(), `.tmp_speech_${id2}.aiff`);
+      const fw = path.join(process.cwd(), `.tmp_speech_${id2}.wav`);
+      const safe = cleanText.replace(/'/g, "'\\''");
+      execSync(`say -v 'Samantha' -r 155 -o "${fa}" '${safe}' && afconvert -f WAVE -d LEI16@24000 "${fa}" "${fw}"`, { timeout: 12000 });
+      if (fs.existsSync(fa)) try { fs.unlinkSync(fa); } catch {}
+      if (fs.existsSync(fw)) {
+        const buf = fs.readFileSync(fw);
+        try { fs.unlinkSync(fw); } catch {}
+        return buf.toString("base64");
       }
-    } catch { /* try next */ }
+    } catch { /* fall through to cloud */ }
   }
 
-  // Fallback to macOS say (local development)
-  try {
-    const id2 = `${Date.now()}_fb`;
-    const fa = path.join(process.cwd(), `.tmp_speech_${id2}.aiff`);
-    const fw = path.join(process.cwd(), `.tmp_speech_${id2}.wav`);
-    const safe = cleanText.replace(/'/g, "'\\''");
-    execSync(`say -v 'Samantha' -r 155 -o "${fa}" '${safe}' && afconvert -f WAVE -d LEI16@24000 "${fa}" "${fw}"`, { timeout: 12000 });
-    if (fs.existsSync(fa)) try { fs.unlinkSync(fa); } catch {}
-    if (fs.existsSync(fw)) {
-      const buf = fs.readFileSync(fw);
-      try { fs.unlinkSync(fw); } catch {}
-      return buf.toString("base64");
-    }
-  } catch (err) { /* try cloud fallback */ }
-
-  // Fallback to Google Cloud TTS Endpoint (works 100% reliably on Vercel & Linux without local CLI tools)
+  // Production-safe: Google Translate TTS HTTP API (no CLI tools needed — works on Vercel Linux)
   try {
     const encoded = encodeURIComponent(cleanText.substring(0, 200));
     const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encoded}&tl=en&client=tw-ob`;
     const tmpGoogle = path.join(process.cwd(), `.tmp_speech_${id}_g.mp3`);
-    execSync(`curl -s -A "Mozilla/5.0" "${url}" -o "${tmpGoogle}"`, { timeout: 8000 });
+    execSync(`curl -s -A "Mozilla/5.0" "${url}" -o "${tmpGoogle}"`, { timeout: 10000 });
     if (fs.existsSync(tmpGoogle)) {
       const buf = fs.readFileSync(tmpGoogle);
       try { fs.unlinkSync(tmpGoogle); } catch {}
@@ -390,14 +413,23 @@ function generatePCMBase64(text: string): string {
 }
 
 /**
- * Extract audio from video and run Faster-Whisper ASR for 100% real speech transcription
+ * Extract audio from video and run Faster-Whisper ASR for 100% real speech transcription.
+ * On Vercel/production (no .venv or Homebrew), this is skipped gracefully.
  */
 async function extractWhisperTranscript(videoPath: string): Promise<string> {
+  const appMode = getAppMode();
+
+  // Skip on Vercel/production — no .venv, no Homebrew, no Faster-Whisper available
+  if (appMode === "production") {
+    console.log("☁️ Production mode: skipping local Faster-Whisper ASR (unavailable on Vercel)");
+    return "";
+  }
+
   const id = `${Date.now()}_${Math.floor(Math.random() * 10000)}`;
   const tmpWav = path.join(process.cwd(), `.tmp_whisper_${id}.wav`);
   try {
     // Extract clean 16kHz mono PCM audio for Whisper ASR
-    await execAsync(`/opt/homebrew/bin/ffmpeg -y -i "${videoPath}" -vn -ar 16000 -ac 1 "${tmpWav}"`);
+    await execAsync(`${FFMPEG_BIN} -y -i "${videoPath}" -vn -ar 16000 -ac 1 "${tmpWav}"`);
 
     if (!fs.existsSync(tmpWav)) return "";
 
@@ -420,7 +452,18 @@ print(full_text)
     const pyPath = path.join(process.cwd(), `.tmp_py_${id}.py`);
     fs.writeFileSync(pyPath, pyScript);
 
-    const { stdout: pyOut } = await execAsync(`.venv/bin/python3 "${pyPath}"`, { timeout: 90000 });
+    // Try multiple python3 resolution paths for local dev
+    let pyOut = "";
+    const pyBins = [".venv/bin/python3", "python3", "python"];
+    for (const pyBin of pyBins) {
+      try {
+        const result = await execAsync(`${pyBin} "${pyPath}"`, { timeout: 90000 });
+        pyOut = result.stdout;
+        break;
+      } catch (pyErr: any) {
+        if (pyBin === pyBins[pyBins.length - 1]) throw pyErr;
+      }
+    }
     try { fs.unlinkSync(pyPath); } catch {}
 
     const transcript = pyOut.trim();
@@ -438,13 +481,22 @@ print(full_text)
  * Extract key video frames and analyze visual posture/eye contact via configured AI model
  */
 async function extractVisionObservation(videoPath: string, totalDur: number, userModel?: string): Promise<string> {
+  const appMode = getAppMode();
+
+  // Skip frame extraction in production — no Homebrew ffmpeg on Vercel Linux.
+  // The /api/analyze handler uses client-side framesBase64 for vision in production.
+  if (appMode === "production") {
+    console.log("☁️ Production mode: skipping local FFmpeg frame extraction for vision");
+    return "";
+  }
+
   const id = `${Date.now()}_${Math.floor(Math.random() * 10000)}`;
   const framePaths: string[] = [];
   try {
     // Use only 1 frame (the mid-point) at 256px max width, heavy compression for fast local inference
     const midTs = Math.max(1, Math.round(totalDur * 0.5));
     const fPath = path.join(process.cwd(), `.tmp_frame_${id}_0.jpg`);
-    await execAsync(`/opt/homebrew/bin/ffmpeg -y -ss ${midTs} -i "${videoPath}" -vframes 1 -vf "scale=256:256:force_original_aspect_ratio=decrease" -q:v 15 "${fPath}"`);
+    await execAsync(`${FFMPEG_BIN} -y -ss ${midTs} -i "${videoPath}" -vframes 1 -vf "scale=256:256:force_original_aspect_ratio=decrease" -q:v 15 "${fPath}"`);
     if (fs.existsSync(fPath)) framePaths.push(fPath);
 
     if (framePaths.length === 0) return "";
@@ -848,7 +900,7 @@ async function analyzeWithGeminiCloud(
       for (let i = 0; i < timestamps.length; i++) {
         const fPath = path.join(process.cwd(), `.tmp_cloud_frame_${id}_${i}.jpg`);
         try {
-          execSync(`/opt/homebrew/bin/ffmpeg -y -ss ${timestamps[i]} -i "${tmpVid}" -vframes 1 -q:v 2 "${fPath}"`, { timeout: 10000, stdio: "ignore" });
+          execSync(`${FFMPEG_BIN} -y -ss ${timestamps[i]} -i "${tmpVid}" -vframes 1 -q:v 2 "${fPath}"`, { timeout: 10000, stdio: "ignore" });
           if (fs.existsSync(fPath)) {
             inlineFrames.push({
               inlineData: {
