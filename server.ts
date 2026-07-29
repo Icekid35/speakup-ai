@@ -7,7 +7,6 @@ import { promisify } from "util";
 const execAsync = promisify(exec);
 
 import fs from "fs";
-import dotenv from "dotenv";
 
 const app = express();
 const PORT = 3000;
@@ -15,16 +14,23 @@ const PORT = 3000;
 app.use(express.json({ limit: "200mb" }));
 app.use(express.urlencoded({ limit: "200mb", extended: true }));
 
+import dotenv from "dotenv";
+
 /**
- * Load environment variables using dotenv library across .env and .env.local
+ * Load environment variables using dotenv library
  */
-function initDotenv() {
-  dotenv.config();
-  dotenv.config({ path: path.resolve(process.cwd(), ".env.local"), override: true });
-  dotenv.config({ path: path.resolve(process.cwd(), ".env.production"), override: true });
-  dotenv.config({ path: path.resolve(process.cwd(), ".env.development"), override: true });
+function loadEnvFile() {
+  const envPath = path.resolve(process.cwd(), ".env");
+  const envLocalPath = path.resolve(process.cwd(), ".env.local");
+
+  if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath, override: true });
+  }
+  if (fs.existsSync(envLocalPath)) {
+    dotenv.config({ path: envLocalPath, override: true });
+  }
 }
-initDotenv();
+loadEnvFile();
 
 const LITERT_SERVER_URL = process.env.LITERT_SERVER_URL || "http://127.0.0.1:9379";
 const MODEL_NAME = "gemma-4-e2b";
@@ -930,7 +936,7 @@ Return ONLY valid JSON with this exact structure:
 
   // Application Mode & Config Endpoint
   app.get("/api/config", (req, res) => {
-    initDotenv();
+    loadEnvFile();
     const isVercel = !!process.env.VERCEL || process.env.NODE_ENV === "production";
     const rawAppMode = (process.env.APP_MODE || "").toLowerCase();
     const appMode = isVercel || rawAppMode === "production" ? "production" : "local";
@@ -951,7 +957,7 @@ Return ONLY valid JSON with this exact structure:
   // Real-Time Model Validation Endpoint
   app.post("/api/validate-key", async (req, res) => {
     try {
-      initDotenv();
+      loadEnvFile();
       const { model } = req.body;
       const isVercel = !!process.env.VERCEL || process.env.NODE_ENV === "production";
       const rawAppMode = (process.env.APP_MODE || "").toLowerCase();
