@@ -579,6 +579,33 @@ except Exception:
       }
     }
 
+    // 4. Cloud Gemini Direct Video ASR (if ffmpeg was missing/failed but video file exists)
+    if (geminiApiKey && fs.existsSync(videoPath)) {
+      try {
+        console.log("🎙️ Attempting Cloud Gemini Direct Video ASR...");
+        const ai = new GoogleGenAI({ apiKey: geminiApiKey.trim() });
+        const videoB64 = fs.readFileSync(videoPath).toString("base64");
+        const targetModel = userModel || getEnvVar("GEMINI_MODEL", "gemma-4-31b-it");
+        const cloudModel = targetModel === "gemma-4-e2b" ? getEnvVar("GEMINI_MODEL", "gemma-4-31b-it") : targetModel;
+
+        const response = await ai.models.generateContent({
+          model: cloudModel,
+          contents: [
+            { inlineData: { mimeType: "video/mp4", data: videoB64 } },
+            "Provide an exact, word-for-word transcript of everything spoken in this video. Return ONLY the spoken transcript text with no extra comments or labels."
+          ]
+        });
+
+        if (response && response.text && response.text.trim()) {
+          const text = response.text.trim();
+          console.log("🎙️ REAL SPEECH TRANSCRIPT (Gemini Video ASR):", text);
+          return text;
+        }
+      } catch (vErr: any) {
+        console.warn("⚠️ Cloud Gemini Video ASR failed:", vErr.message);
+      }
+    }
+
     return "";
   } catch (err: any) {
     console.warn("⚠️ Speech transcription pipeline failed:", err.message);

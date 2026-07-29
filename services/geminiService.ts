@@ -88,23 +88,13 @@ export const analyzeVideo = async (
   videoDuration?: number
 ): Promise<SpeakUpAnalysis> => {
   const dur = videoDuration && videoDuration > 0 ? Math.round(videoDuration) : 60;
-  let videoBase64 = await blobToBase64(blob);
-  let framesBase64: string[] = [];
-
-  // Vercel Serverless Function payload limit is 4.5 MB.
-  // If base64 string exceeds 2.5 MB (2,500,000 chars), extract compressed client JPEG frames (~100KB)
-  // to avoid Vercel HTTP 413 (Content Too Large) errors.
-  if (videoBase64.length > 2500000) {
-    framesBase64 = await extractVideoFramesClient(blob, 5);
-    videoBase64 = ""; // Omit large video base64 string so HTTP payload stays < 300KB
-  }
+  const videoBase64 = await blobToBase64(blob);
 
   const res = await fetch("/api/analyze", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       videoBase64,
-      framesBase64,
       mimeType: blob.type || "video/mp4",
       mode,
       context,
