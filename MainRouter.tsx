@@ -10,19 +10,20 @@ import App from './App';
 
 const MainContent: React.FC = () => {
   const { path } = useRouter();
+  const cleanPath = (path || '/').split('?')[0].replace(/\/$/, '') || '/';
 
   // Route: /app -> Render the original application experience
-  if (path === '/app' || path.startsWith('/app/')) {
+  if (cleanPath === '/app' || cleanPath.startsWith('/app/')) {
     return <App />;
   }
 
   // Marketing Site Routes with Navbar & Footer
   let pageComponent = <LandingPage />;
-  if (path === '/features') {
+  if (cleanPath === '/features' || cleanPath.startsWith('/features/')) {
     pageComponent = <FeaturesPage />;
-  } else if (path === '/about') {
+  } else if (cleanPath === '/about' || cleanPath.startsWith('/about/')) {
     pageComponent = <AboutPage />;
-  } else if (path === '/contact') {
+  } else if (cleanPath === '/contact' || cleanPath.startsWith('/contact/')) {
     pageComponent = <ContactPage />;
   }
 

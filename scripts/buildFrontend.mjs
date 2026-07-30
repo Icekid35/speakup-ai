@@ -1,6 +1,7 @@
 import { build } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -24,6 +25,16 @@ try {
       emptyOutDir: true,
     },
   });
+
+  // Copy app-images folder to dist/app-images so image assets exist in production
+  const appImagesSrc = path.resolve(rootDir, 'app-images');
+  const appImagesDest = path.resolve(rootDir, 'dist/app-images');
+  if (fs.existsSync(appImagesSrc)) {
+    fs.mkdirSync(appImagesDest, { recursive: true });
+    fs.cpSync(appImagesSrc, appImagesDest, { recursive: true });
+    console.log('📁 Copied app-images to dist/app-images successfully!');
+  }
+
   console.log('✅ Frontend build succeeded!');
 } catch (err) {
   console.error('❌ Build failed:', err);

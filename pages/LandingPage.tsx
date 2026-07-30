@@ -30,22 +30,12 @@ export const LandingPage: React.FC = () => {
       {/* ---------------------------------------------------------------- border */}
       {/* HERO SECTION */}
       {/* ---------------------------------------------------------------- */}
-      <section className="relative pt-32 pb-20 md:pt-40 md:pb-28 overflow-hidden">
+      <section className="relative pt-24 pb-16 md:pt-28 md:pb-24 overflow-hidden">
         {/* Subtle grid accent background */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f015_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f015_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           
-          {/* Eyebrow Badge */}
-          <div className="flex justify-center mb-6 animate-fade-in">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-slate-200 shadow-xs text-xs font-medium text-slate-700 hover:border-slate-300 transition-colors">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="font-semibold text-slate-900">Multimodal Speaking Intelligence</span>
-              <span className="text-slate-300">•</span>
-              <span className="text-indigo-600 font-mono text-[11px]">LiteRT + Cloud Multimodal Engine</span>
-            </div>
-          </div>
-
           {/* Headline */}
           <div className="text-center max-w-4xl mx-auto space-y-6">
             <h1 className="text-4xl sm:text-6xl lg:text-7xl font-bold tracking-tight text-slate-900 leading-[1.08]">

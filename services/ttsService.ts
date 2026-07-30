@@ -36,6 +36,44 @@ function writeString(view: DataView, offset: number, string: string) {
 }
 
 /**
+ * Universal Base64 to Audio Blob Converter
+ * Correctly distinguishes RIFF WAV header, MP3 ID3/MPEG headers, and raw PCM
+ * without corrupting MP3 streams with invalid WAV headers!
+ */
+export const base64ToAudioBlob = (base64Audio: string): Blob => {
+  if (!base64Audio) return new Blob([], { type: 'audio/mpeg' });
+
+  try {
+    const binaryString = atob(base64Audio);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    // 1. Check for RIFF header (WAV file)
+    if (bytes.length >= 4 && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) {
+      return new Blob([bytes], { type: 'audio/wav' });
+    }
+
+    // 2. Check for ID3 or MPEG frame sync (MP3 file)
+    if (
+      bytes.length >= 3 &&
+      ((bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) ||
+       (bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0))
+    ) {
+      return new Blob([bytes], { type: 'audio/mpeg' });
+    }
+
+    // 3. Fallback: treat as audio/mpeg for native browser HTML5 audio playback
+    return new Blob([bytes], { type: 'audio/mpeg' });
+  } catch (err) {
+    console.error("base64ToAudioBlob conversion error:", err);
+    return new Blob([], { type: 'audio/mpeg' });
+  }
+};
+
+/**
  * Speak text aloud using browser Web Speech API
  */
 export const speakWithBrowserSynth = (text: string): Promise<void> => {
@@ -74,7 +112,7 @@ export const speakWithBrowserSynth = (text: string): Promise<void> => {
 };
 
 /**
- * Generate WAV audio Blob from local server PCM audio endpoint
+ * Generate audio Blob from local server TTS endpoint
  */
 export const generateCoachSpeech = async (text: string): Promise<Blob> => {
   try {
@@ -93,24 +131,9 @@ export const generateCoachSpeech = async (text: string): Promise<Blob> => {
       throw new Error("No audio content received from TTS endpoint");
     }
 
-    // Decode base64 audio payload
-    const binaryString = atob(base64Audio);
-    const len = binaryString.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-
-    // Check if bytes already contains RIFF WAV header
-    let wavBytes = bytes;
-    if (bytes[0] !== 82 || bytes[1] !== 73 || bytes[2] !== 70 || bytes[3] !== 70) {
-      wavBytes = writeWavHeader(bytes, 24000);
-    }
-    return new Blob([wavBytes], { type: 'audio/wav' });
-
+    return base64ToAudioBlob(base64Audio);
   } catch (error) {
     console.error("Local TTS Error:", error);
-    return new Blob([], { type: 'audio/wav' });
+    return new Blob([], { type: 'audio/mpeg' });
   }
 };
-

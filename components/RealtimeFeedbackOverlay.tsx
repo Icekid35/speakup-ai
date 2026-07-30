@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, Zap, Gauge, AlertCircle, Sparkles, Volume2, ShieldAlert, ChevronUp, ChevronDown, RefreshCw, X, Play, Eye, User } from 'lucide-react';
 import { getRealtimeFeedback, fetchCoachIntervention, RealtimeFeedbackResponse, CoachInterventionResponse } from '../services/geminiService';
+import { base64ToAudioBlob } from '../services/ttsService';
 
 interface RealtimeFeedbackOverlayProps {
   stream: MediaStream | null;
@@ -99,46 +100,15 @@ export const RealtimeFeedbackOverlay: React.FC<RealtimeFeedbackOverlayProps> = (
 
   const playInterventionAudio = (base64Audio: string) => {
     try {
-      const binaryString = atob(base64Audio);
-      const len = binaryString.length;
-      const bytes = new Uint8Array(len);
-      for (let i = 0; i < len; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-
-      const header = new ArrayBuffer(44);
-      const view = new DataView(header);
-      const writeString = (v: DataView, offset: number, str: string) => {
-        for (let i = 0; i < str.length; i++) v.setUint8(offset + i, str.charCodeAt(i));
-      };
-
-      writeString(view, 0, 'RIFF');
-      view.setUint32(4, 36 + bytes.length, true);
-      writeString(view, 8, 'WAVE');
-      writeString(view, 12, 'fmt ');
-      view.setUint32(16, 16, true);
-      view.setUint16(20, 1, true);
-      view.setUint16(22, 1, true);
-      view.setUint32(24, 24000, true);
-      view.setUint32(28, 48000, true);
-      view.setUint16(32, 2, true);
-      view.setUint16(34, 16, true);
-      writeString(view, 36, 'data');
-      view.setUint32(40, bytes.length, true);
-
-      const wavBytes = new Uint8Array(44 + bytes.length);
-      wavBytes.set(new Uint8Array(header), 0);
-      wavBytes.set(bytes, 44);
-
-      const blob = new Blob([wavBytes], { type: 'audio/wav' });
+      const blob = base64ToAudioBlob(base64Audio);
       const url = URL.createObjectURL(blob);
 
       if (interventionAudioRef.current) {
         interventionAudioRef.current.src = url;
-        interventionAudioRef.current.play().catch(e => console.error("Intervention audio play error:", e));
+        interventionAudioRef.current.play().catch(e => console.error("Intervention audio play failed:", e));
       }
     } catch (e) {
-      console.error("Intervention audio decode error:", e);
+      console.error("Failed to decode intervention audio:", e);
     }
   };
 

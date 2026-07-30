@@ -4,6 +4,7 @@ import {
   Bot, Volume2, Square, Award, ArrowRight, RotateCcw, ChevronDown, Sparkles, X, Brain
 } from 'lucide-react';
 import { fetchInterviewStep, fetchInterviewSummary, InterviewSummaryResponse } from '../services/geminiService';
+import { base64ToAudioBlob } from '../services/ttsService';
 
 /** Three bouncing dots — shown while the AI is generating a response */
 const ThinkingDots: React.FC = () => (
@@ -156,42 +157,36 @@ export const AIInterviewStage: React.FC<AIInterviewStageProps> = ({ onExit }) =>
     try {
       try { recognitionRef.current?.stop(); } catch (e) {}
       setIsPlayingAudio(true);
-      const binaryString = atob(base64Audio);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
 
-      let wavBytes = bytes;
-      if (bytes[0] !== 82 || bytes[1] !== 73 || bytes[2] !== 70 || bytes[3] !== 70) {
-        const header = new ArrayBuffer(44);
-        const view = new DataView(header);
-        const ws = (v: DataView, o: number, s: string) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
-        ws(view, 0, 'RIFF'); view.setUint32(4, 36 + bytes.length, true);
-        ws(view, 8, 'WAVE'); ws(view, 12, 'fmt ');
-        view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
-        view.setUint32(24, 24000, true); view.setUint32(28, 48000, true);
-        view.setUint16(32, 2, true); view.setUint16(34, 16, true);
-        ws(view, 36, 'data'); view.setUint32(40, bytes.length, true);
-        wavBytes = new Uint8Array(44 + bytes.length);
-        wavBytes.set(new Uint8Array(header), 0);
-        wavBytes.set(bytes, 44);
-      }
+      const blob = base64ToAudioBlob(base64Audio);
+      const url = URL.createObjectURL(blob);
 
-      const url = URL.createObjectURL(new Blob([wavBytes], { type: 'audio/wav' }));
       if (audioRef.current) {
         audioRef.current.src = url;
         audioRef.current.play().then(() => {
           audioRef.current!.onended = () => {
-            setIsPlayingAudio(false); setIsEvaluating(false);
-            if (onEndedCallback) onEndedCallback(); else initSpeechRecognition();
+            setIsPlayingAudio(false);
+            setIsEvaluating(false);
+            if (onEndedCallback) onEndedCallback();
+            else initSpeechRecognition();
           };
-        }).catch(e => {
-          setIsPlayingAudio(false); setIsEvaluating(false);
-          if (onEndedCallback) onEndedCallback(); else initSpeechRecognition();
+        }).catch((playErr) => {
+          console.warn("Audio playback exception, proceeding:", playErr);
+          setIsPlayingAudio(false);
+          setIsEvaluating(false);
+          if (onEndedCallback) onEndedCallback();
+          else initSpeechRecognition();
         });
+      } else {
+        setIsPlayingAudio(false);
+        setIsEvaluating(false);
       }
     } catch (e) {
-      setIsPlayingAudio(false); setIsEvaluating(false);
-      if (onEndedCallback) onEndedCallback(); else initSpeechRecognition();
+      console.error("Audio error:", e);
+      setIsPlayingAudio(false);
+      setIsEvaluating(false);
+      if (onEndedCallback) onEndedCallback();
+      else initSpeechRecognition();
     }
   };
 

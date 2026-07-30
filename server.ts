@@ -1791,6 +1791,13 @@ Return JSON strictly:
     }
   } else {
     const distPath = path.join(process.cwd(), 'dist');
+    const appImagesDist = path.join(distPath, 'app-images');
+    const appImagesRoot = path.join(process.cwd(), 'app-images');
+
+    // Express Static Asset Handlers (must be before wildcard SPA fallback)
+    app.use('/app-images', express.static(appImagesDist));
+    app.use('/app-images', express.static(appImagesRoot));
+
     if (fs.existsSync(distPath)) {
       app.use(express.static(distPath));
     }
@@ -1807,11 +1814,24 @@ Return JSON strictly:
     });
   }
 
-  // Only skip binding on Vercel (serverless functions handle HTTP differently).
-  // On Render, Railway, Fly.io, etc. — we must bind to process.env.PORT.
+  // 10-minute Auto-Ping Keep-Alive to prevent Render inactivity sleep
   if (!process.env.VERCEL) {
+    const TEN_MINUTES_MS = 10 * 60 * 1000;
+    setInterval(async () => {
+      try {
+        const targetUrl = process.env.RENDER_EXTERNAL_URL || `http://127.0.0.1:${PORT}`;
+        console.log(`⏱️ [Keep-Alive Ping] Requesting ${targetUrl}/api/config to keep Render server awake...`);
+        const pingRes = await fetch(`${targetUrl}/api/config`);
+        if (pingRes.ok) {
+          console.log(`✅ [Keep-Alive Ping] Server active.`);
+        }
+      } catch (err: any) {
+        console.log(`⏱️ [Keep-Alive Ping Note]:`, err.message);
+      }
+    }, TEN_MINUTES_MS);
+
     app.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server listening on http://0.0.0.0:${PORT}`);
+      console.log(`🚀 SpeakUp.ai Server listening on http://0.0.0.0:${PORT}`);
     });
   }
 }
