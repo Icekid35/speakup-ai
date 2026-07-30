@@ -82,8 +82,8 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 px-3 md:px-6 py-2.5 bg-white/90 backdrop-blur-xl border-b border-slate-200 flex justify-between items-center whitespace-nowrap min-w-0">
-      {/* Brand Wordmark */}
-      <div className="flex items-center gap-2 shrink-0">
+      {/* Brand Wordmark & Home Link */}
+      <a href="/" className="flex items-center gap-2 shrink-0 group hover:opacity-90 transition-opacity">
         <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
           <svg className="w-4 h-4 text-indigo-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="12" cy="12" r="3" fill="currentColor" />
@@ -95,9 +95,9 @@ export const Header: React.FC<HeaderProps> = ({
           <h1 className="text-sm font-bold tracking-tight text-slate-900 flex items-center gap-0.5 leading-none">
             speakup<span className="text-indigo-600 font-mono text-xs">.ai</span>
           </h1>
-          <p className="hidden sm:block text-[10px] text-slate-400 tracking-wide font-mono mt-0.5 leading-none">Own the Room. Every Time.</p>
+          <p className="hidden sm:block text-[10px] text-slate-400 tracking-wide font-mono mt-0.5 leading-none">← Back to Site</p>
         </div>
-      </div>
+      </a>
 
       {/* Right Desktop Nav & Model Status */}
       <div className="flex items-center gap-2 md:gap-3 shrink-0">

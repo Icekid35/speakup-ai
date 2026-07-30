@@ -3,9 +3,32 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>speakup.ai — Multimodal Speaking Intelligence & Executive Presence AI</title>
+  <title>SpeakUp.ai — Multimodal Speaking Intelligence & Executive Presence AI</title>
+  
+  <meta name="description" content="SpeakUp.ai is an AI communication coach powered by Google Gemma 4. Evaluate speech prosody, eye contact, body posture, and script structure with on-device LiteRT or cloud models.">
+  <meta name="keywords" content="SpeakUp.ai, Google Gemma 4, AI Communication Coach, Public Speaking AI, Thesis Defense Practice, Mock Interview Simulator, LiteRT Local AI">
+  <meta name="author" content="SpeakUp.ai Team">
+  <meta name="robots" content="index, follow">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://speakup-ai-tawny.vercel.app/">
+  <meta property="og:title" content="SpeakUp.ai — Multimodal Speaking Intelligence">
+  <meta property="og:description" content="Master the room before you step into it. AI presentation coaching, script doctoring, and mock interview practice powered by Google Gemma 4.">
+  <meta property="og:image" content="https://speakup-ai-tawny.vercel.app/app-images/197e26026628908ca8aa3d5eb22b758f.png">
+
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://speakup-ai-tawny.vercel.app/">
+  <meta property="twitter:title" content="SpeakUp.ai — Multimodal Speaking Intelligence">
+  <meta property="twitter:description" content="Master the room before you step into it. AI presentation coaching, script doctoring, and mock interview practice powered by Google Gemma 4.">
+  <meta property="twitter:image" content="https://speakup-ai-tawny.vercel.app/app-images/197e26026628908ca8aa3d5eb22b758f.png">
+
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
   <script>
     tailwind.config = {
       theme: {
@@ -16,13 +39,12 @@
           },
           colors: {
             speakup: {
-              bg: '#f8fafc',       // Slate-50 Light Background
-              card: '#ffffff',     // Pure White Surface Card
-              border: '#e2e8f0',   // Slate-200 Border
-              accent: '#0f172a',   // Slate-900 High Contrast Text
-              gold: '#d97706',     // Warm Amber
-              emerald: '#059669',  // Vibrant Emerald
-              glass: 'rgba(255, 255, 255, 0.9)',
+              bg: '#f8fafc',
+              card: '#ffffff',
+              border: '#e2e8f0',
+              accent: '#0f172a',
+              gold: '#d97706',
+              emerald: '#059669',
             },
           },
           animation: {
@@ -48,6 +70,7 @@
       }
     }
   </script>
+  
   <style>
     body {
       background-color: #f8fafc;
@@ -58,7 +81,6 @@
       -moz-osx-font-smoothing: grayscale;
     }
     
-    /* Native App Touch Optimizations */
     * {
       -webkit-tap-highlight-color: transparent;
       user-select: none;
@@ -66,19 +88,10 @@
     input, textarea, [contenteditable="true"] {
       user-select: text;
     }
-    
-    /* Clean glass panel for light theme */
-    .glass-panel {
-      background: rgba(255, 255, 255, 0.9);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid rgba(226, 232, 240, 0.8);
-    }
 
-    /* Light scrollbar styling */
     ::-webkit-scrollbar {
-      width: 4px;
-      height: 4px;
+      width: 6px;
+      height: 6px;
     }
     ::-webkit-scrollbar-track {
       background: #f1f5f9;
@@ -88,21 +101,29 @@
       border-radius: 9999px;
     }
   </style>
-<script type="importmap">
-{
-  "imports": {
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.31.0",
-    "react/": "https://aistudiocdn.com/react@^19.2.1/",
-    "react": "https://aistudiocdn.com/react@^19.2.1"
+
+  <!-- Schema.org Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "SpeakUp.ai",
+    "url": "https://speakup-ai-tawny.vercel.app/",
+    "applicationCategory": "EducationalApplication",
+    "operatingSystem": "All",
+    "description": "Multimodal speaking intelligence & executive presence AI powered by Google Gemma 4.",
+    "offers": {
+      "@type": "Offer",
+      "price": "0.00",
+      "priceCurrency": "USD"
+    }
   }
-}
-</script>
+  </script>
+
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234f46e5'><circle cx='12' cy='12' r='10'/></svg>">
 </head>
 <body>
   <div id="root"></div>
-<script type="module" src="/index.tsx"></script>
+  <script type="module" src="/index.tsx"></script>
 </body>
 </html>
