@@ -9,7 +9,6 @@ import { analyzeVideo, generateDebriefScript } from './services/geminiService';
 import { generateCoachSpeech } from './services/ttsService';
 import { SpeakUpAnalysis, Segment } from './types';
 import { AnalysisView } from './components/AnalysisView';
-import { VideoProcessingModal } from './components/VideoProcessingModal';
 import { ChevronDown, Video, UserCheck, FileText, Settings } from 'lucide-react';
 
 function App() {
@@ -296,11 +295,6 @@ function App() {
         onKeySaved={() => {
           setApiKeyModalNotice(null);
         }}
-      />
-
-      <VideoProcessingModal
-        isAnalyzing={isAnalyzing}
-        progress={analysisProgress}
       />
     </div>
   );
