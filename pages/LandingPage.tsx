@@ -87,15 +87,15 @@ export const LandingPage: React.FC = () => {
             <div className="relative rounded-2xl bg-slate-900/5 p-2 sm:p-3 ring-1 ring-slate-900/10 shadow-2xl">
               
               {/* Browser Window Header */}
-              <div className="bg-white rounded-t-xl px-4 py-3 border-b border-slate-200/80 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-slate-300"></div>
-                  <div className="w-3 h-3 rounded-full bg-slate-300"></div>
-                  <div className="w-3 h-3 rounded-full bg-slate-300"></div>
-                  <span className="ml-2 text-xs font-mono text-slate-400">speakup-ai-tawny.vercel.app/app</span>
+              <div className="bg-white rounded-t-xl px-3 sm:px-4 py-2.5 sm:py-3 border-b border-slate-200/80 flex items-center justify-between gap-2 overflow-hidden">
+                <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                  <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-slate-300 shrink-0"></div>
+                  <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-slate-300 shrink-0"></div>
+                  <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-slate-300 shrink-0"></div>
+                  <span className="ml-1 sm:ml-2 text-[10px] sm:text-xs font-mono text-slate-400 truncate max-w-[130px] xs:max-w-[200px] sm:max-w-none">speakup-ai.onrender.com/app</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-mono text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 font-medium">
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-[9px] sm:text-[11px] font-mono text-emerald-600 bg-emerald-50 px-1.5 sm:px-2 py-0.5 rounded border border-emerald-200 font-medium whitespace-nowrap">
                     Studio Stage • Live Evaluation
                   </span>
                 </div>

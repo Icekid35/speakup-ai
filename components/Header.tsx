@@ -99,8 +99,32 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </a>
 
-      {/* Right Desktop Nav & Model Status */}
-      <div className="flex items-center gap-2 md:gap-3 shrink-0">
+      {/* Right Nav & Model Status */}
+      <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 shrink-0">
+        {/* Mobile Navigation Tabs (flex md:hidden) */}
+        <div className="flex md:hidden items-center p-0.5 bg-slate-100 border border-slate-200 rounded-lg text-[11px]">
+          <button
+            onClick={() => onModeChange('presentation')}
+            className={`px-2 py-1 rounded font-medium transition-all ${
+              currentMode === 'presentation'
+                ? 'bg-white text-indigo-600 font-semibold shadow-xs'
+                : 'text-slate-600'
+            }`}
+          >
+            Studio
+          </button>
+          <button
+            onClick={() => onModeChange('interview')}
+            className={`px-2 py-1 rounded font-medium transition-all ${
+              currentMode === 'interview'
+                ? 'bg-white text-indigo-600 font-semibold shadow-xs'
+                : 'text-slate-600'
+            }`}
+          >
+            Examiner
+          </button>
+        </div>
+
         {/* Desktop Navigation Tabs (md:flex) */}
         <div className="hidden md:flex items-center p-1 bg-slate-100 border border-slate-200 rounded-xl">
           <button
@@ -129,9 +153,11 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Script Doctor Button */}
         <button
           onClick={onOpenScriptDoctor}
-          className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-medium transition-all shadow-sm"
+          className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-medium transition-all shadow-sm"
+          title="Script Rewriter"
         >
-          <FileText className="w-3.5 h-3.5 text-indigo-600" /> Script Rewriter
+          <FileText className="w-3.5 h-3.5 text-indigo-600" />
+          <span className="hidden sm:inline">Script Rewriter</span>
         </button>
 
         {/* Dynamic Model & API Key Badge Button */}
