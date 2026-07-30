@@ -98,12 +98,12 @@ export const Footer: React.FC = () => {
               </li>
               <li>
                 <a
-                  href="https://kaggle.com"
+                  href="https://ai.google.dev/gemma"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 hover:text-white transition-colors"
                 >
-                  <span>Google Gemma Hackathon</span>
+                  <span>Google Gemma AI</span>
                   <ExternalLink className="w-3 h-3" />
                 </a>
               </li>
@@ -114,7 +114,7 @@ export const Footer: React.FC = () => {
 
         {/* Bottom Bar */}
         <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <p>© {new Date().getFullYear()} SpeakUp.ai. Crafted for the Google Gemma 4 Hackathon.</p>
+          <p>© {new Date().getFullYear()} SpeakUp.ai. Powered by Google Gemma 4.</p>
           <div className="flex items-center gap-6">
             <Link to="/about" className="hover:text-slate-400 transition-colors">Mission</Link>
             <Link to="/contact" className="hover:text-slate-400 transition-colors">Support</Link>

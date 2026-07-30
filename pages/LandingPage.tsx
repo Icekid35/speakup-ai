@@ -40,7 +40,7 @@ export const LandingPage: React.FC = () => {
           <div className="flex justify-center mb-6 animate-fade-in">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-slate-200 shadow-xs text-xs font-medium text-slate-700 hover:border-slate-300 transition-colors">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="font-semibold text-slate-900">Google Gemma 4 Hackathon Entry</span>
+              <span className="font-semibold text-slate-900">Multimodal Speaking Intelligence</span>
               <span className="text-slate-300">•</span>
               <span className="text-indigo-600 font-mono text-[11px]">LiteRT + Cloud Multimodal Engine</span>
             </div>
@@ -643,7 +643,7 @@ export const LandingPage: React.FC = () => {
           </div>
 
           <p className="text-xs text-slate-500 pt-2 font-mono">
-            SpeakUp.ai • Built for the Google Gemma 4 Competition
+            SpeakUp.ai • Multimodal Speaking Intelligence & Executive Presence AI
           </p>
         </div>
       </section>

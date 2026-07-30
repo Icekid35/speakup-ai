@@ -16,7 +16,7 @@ export const AboutPage: React.FC = () => {
             Democratizing Executive Communication Coaching
           </h1>
           <p className="text-lg text-slate-600 leading-relaxed font-normal">
-            SpeakUp.ai was designed from the ground up for the Google Gemma 4 Competition to bridge the gap between technical expertise and convincing delivery.
+            SpeakUp.ai was designed to bridge the gap between technical expertise and convincing delivery using Google Gemma 4.
           </p>
         </div>
 
