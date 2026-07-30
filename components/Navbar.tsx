@@ -44,8 +44,12 @@ export const Navbar: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
         {/* Brand Logo */}
         <Link to="/" className="flex items-center gap-3 group">
-          <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center text-white shadow-sm transition-transform duration-200 group-hover:scale-105">
-            <span className="font-bold text-lg tracking-tight font-mono">S</span>
+          <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-xs shrink-0 transition-transform duration-200 group-hover:scale-105">
+            <svg className="w-4 h-4 text-indigo-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="3" fill="currentColor" />
+              <circle cx="12" cy="12" r="7" strokeDasharray="2 2" />
+              <circle cx="12" cy="12" r="10" strokeOpacity="0.4" />
+            </svg>
           </div>
           <div className="flex flex-col">
             <div className="flex items-center gap-2">

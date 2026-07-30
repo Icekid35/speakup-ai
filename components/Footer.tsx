@@ -11,8 +11,12 @@ export const Footer: React.FC = () => {
           {/* Brand Column */}
           <div className="md:col-span-2 space-y-4">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold font-mono">
-                S
+              <div className="w-8 h-8 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+                <svg className="w-4 h-4 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="3" fill="currentColor" />
+                  <circle cx="12" cy="12" r="7" strokeDasharray="2 2" />
+                  <circle cx="12" cy="12" r="10" strokeOpacity="0.4" />
+                </svg>
               </div>
               <span className="text-xl font-bold text-white tracking-tight">
                 speakup<span className="text-indigo-400">.ai</span>
