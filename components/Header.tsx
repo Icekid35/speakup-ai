@@ -101,30 +101,6 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right Nav & Model Status */}
       <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 shrink-0">
-        {/* Mobile Navigation Tabs (flex md:hidden) */}
-        <div className="flex md:hidden items-center p-0.5 bg-slate-100 border border-slate-200 rounded-lg text-[11px]">
-          <button
-            onClick={() => onModeChange('presentation')}
-            className={`px-2 py-1 rounded font-medium transition-all ${
-              currentMode === 'presentation'
-                ? 'bg-white text-indigo-600 font-semibold shadow-xs'
-                : 'text-slate-600'
-            }`}
-          >
-            Studio
-          </button>
-          <button
-            onClick={() => onModeChange('interview')}
-            className={`px-2 py-1 rounded font-medium transition-all ${
-              currentMode === 'interview'
-                ? 'bg-white text-indigo-600 font-semibold shadow-xs'
-                : 'text-slate-600'
-            }`}
-          >
-            Examiner
-          </button>
-        </div>
-
         {/* Desktop Navigation Tabs (md:flex) */}
         <div className="hidden md:flex items-center p-1 bg-slate-100 border border-slate-200 rounded-xl">
           <button
