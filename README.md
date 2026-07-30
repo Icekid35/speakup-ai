@@ -288,118 +288,223 @@ Below is a directory map showing where crucial features are implemented:
 
 ---
 
-## Getting Started
+## Getting Started (Quick & Easy Setup)
 
-Follow these step-by-step instructions to run SpeakUp.ai locally on your machine.
-
----
-
-### Prerequisites & System Packages
-
-Before running the application, make sure you have the following installed on your system:
-
-#### 1. Node.js (v18 or higher)
-- **macOS / Linux / Windows**: Download and install Node.js from [nodejs.org](https://nodejs.org/).
-
-#### 2. FFmpeg (Audio extraction & video frame demuxing)
-FFmpeg is required for extracting audio and visual frames from presentation videos.
-- **macOS (Homebrew)**:
-  ```bash
-  brew install ffmpeg
-  ```
-- **Linux (Ubuntu / Debian / Render)**:
-  ```bash
-  sudo apt update && sudo apt install -y ffmpeg
-  ```
-- **Windows (Chocolatey / Scoop)**:
-  ```bash
-  choco install ffmpeg
-  # OR
-  scoop install ffmpeg
-  ```
-
-#### 3. Python 3.9+ & Faster-Whisper ASR
-Faster-Whisper provides fast, local speech-to-text recognition.
-1. Create and activate a Python virtual environment inside the project directory:
-   ```bash
-   # macOS / Linux
-   python3 -m venv .venv
-   source .venv/bin/activate
-
-   # Windows (Command Prompt / PowerShell)
-   python -m venv .venv
-   .venv\Scripts\activate
-   ```
-2. Install `faster-whisper` and `edge-tts`:
-   ```bash
-   pip install --upgrade pip
-   pip install faster-whisper edge-tts
-   ```
+Running SpeakUp.ai takes less than 2 minutes.
 
 ---
 
-### Step-by-Step Installation
+### Step 1: Clone & Install Dependencies
 
-#### Step 1: Clone the Repository
 ```bash
+# 1. Clone the repository
 git clone https://github.com/Icekid35/speakup-ai.git
 cd speakup-ai
-```
 
-#### Step 2: Install Node Dependencies
-```bash
+# 2. Install Node dependencies
 npm install
+
+# 3. Setup Python Virtual Environment for Speech & Local ASR
+python3 -m venv .venv
+source .venv/bin/activate
+pip install faster-whisper edge-tts
 ```
 
-#### Step 3: Configure Environment Variables
-Create a `.env` file in the root directory (or copy from `.env.example`):
+---
+
+### Step 2: Configure API Key
+
+Copy the environment template:
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` and set your desired mode and API keys:
+Open `.env` and add your free Gemini API key (get a free key at [aistudio.google.com](https://aistudio.google.com/)):
 ```env
-# Application Mode: 'local' (on-device LiteRT) or 'production' (Cloud API)
-NEXT_PUBLIC_APP_MODE=local
-
-# Google Cloud Gemini API Key (get a free key at https://aistudio.google.com/)
 NEXT_PUBLIC_GEMINI_API_KEY=your_gemini_api_key_here
-NEXT_PUBLIC_GEMINI_MODEL=gemma-4-31b-it
+```
 
-# Optional: Groq Whisper API for sub-second, zero-RAM cloud speech transcription
-# (Get a free key at https://console.groq.com/keys)
-NEXT_PUBLIC_GROQ_API_KEY=your_groq_api_key_here
+> **Tip:** You can also enter or change your API key anytime directly inside the application UI by clicking the model badge in the top right corner!
+
+---
+
+### Step 3: Launch the Application
+
+```bash
+npm run dev
+```
+
+Open **`http://localhost:3000`** in your browser. That's it!
+
+---
+
+### Running Gemma 4 Locally with LiteRT
+
+This guide shows you how to install and run **Google Gemma 4** locally using **LiteRT** on macOS and Windows.
+
+#### Requirements
+
+- Python 3.12+
+- Internet connection (first download only)
+
+---
+
+#### 1. Install Python 3.12
+
+##### macOS
+
+```bash
+brew install python@3.12
+python3.12 --version
+```
+
+##### Windows
+
+Download and install Python 3.12 from:
+[https://www.python.org/downloads/windows/](https://www.python.org/downloads/windows/)
+
+Verify:
+```powershell
+python --version
 ```
 
 ---
 
-### Running Local Gemma 4 (Optional — for Offline On-Device Mode)
+#### 2. Install LiteRT
 
-If you want to run **Google Gemma 4** completely offline on your device:
+##### macOS
 
-1. Activate your virtual environment and install **LiteRT-LM**:
-   ```bash
-   # Make sure your virtual environment is activated!
-   source .venv/bin/activate
-   
-   python3 -m pip install --upgrade pip
-   python3 -m pip install litert-lm
-   ```
+```bash
+brew install uv
 
-2. Start the local LiteRT-LM server on port `9379`:
-   ```bash
-   # Method A: With activated environment
-   source .venv/bin/activate
-   litert-lm serve --model google/gemma-4-e2b --port 9379
+uv python install 3.12
 
-   # Method B: Direct path execution (no venv activation needed)
-   ./.venv/bin/litert-lm serve --model google/gemma-4-e2b --port 9379
-   ```
+uv tool install --python 3.12 litert-lm
 
-3. Alternatively, serve locally using **Ollama** (OpenAI-compatible local endpoint):
-   ```bash
-   ollama run gemma:2b
-   ```
+uv tool update-shell
+
+exec zsh
+```
+
+Verify:
+```bash
+litert-lm --help
+```
+
+##### Windows
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+uv python install 3.12
+
+uv tool install --python 3.12 litert-lm
+```
+
+Restart PowerShell or Command Prompt, then verify:
+```powershell
+litert-lm --help
+```
+
+---
+
+#### 3. Install Hugging Face CLI
+
+##### macOS
+
+```bash
+uv tool install huggingface-hub
+
+hf --version
+```
+
+##### Windows
+
+```powershell
+uv tool install huggingface-hub
+
+hf --version
+```
+
+---
+
+#### 4. Login to Hugging Face
+
+1. Create a free account at [https://huggingface.co](https://huggingface.co)
+2. Accept the Gemma model license at [https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm](https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm)
+3. Create a **Read** access token at [https://huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
+
+Login:
+```bash
+hf auth login
+```
+
+---
+
+#### 5. Download Gemma 4
+
+##### GPU
+
+```bash
+litert-lm run \
+  --from-huggingface-repo=litert-community/gemma-4-E2B-it-litert-lm \
+  gemma-4-E2B-it.litertlm \
+  --backend=gpu \
+  --prompt="Hello"
+```
+
+##### CPU
+
+```bash
+litert-lm run \
+  --from-huggingface-repo=litert-community/gemma-4-E2B-it-litert-lm \
+  gemma-4-E2B-it.litertlm \
+  --backend=cpu \
+  --prompt="Hello"
+```
+
+---
+
+#### 6. Import the Model
+
+```bash
+litert-lm import \
+  --from-huggingface-repo=litert-community/gemma-4-E2B-it-litert-lm \
+  gemma-4-E2B-it.litertlm \
+  gemma4-e2b
+```
+
+Verify:
+```bash
+litert-lm list
+```
+
+---
+
+#### 7. Start the Local Server
+
+```bash
+litert-lm serve
+```
+
+The OpenAI-compatible API will be available at:
+`http://127.0.0.1:9379/v1`
+
+---
+
+#### Everyday Usage
+
+Once everything is installed, simply run:
+
+```bash
+litert-lm serve
+```
+or on Windows:
+```powershell
+litert-lm serve
+```
+
+That's all you need to start your local Gemma server.
 
 ---
 
