@@ -377,17 +377,28 @@ NEXT_PUBLIC_GROQ_API_KEY=your_groq_api_key_here
 
 If you want to run **Google Gemma 4** completely offline on your device:
 
-1. Install **LiteRT-LM** (Official Google Runtime):
+1. Activate your virtual environment and install **LiteRT-LM**:
    ```bash
-   pip install litert-lm
+   # Make sure your virtual environment is activated!
+   source .venv/bin/activate
+   
+   python3 -m pip install --upgrade pip
+   python3 -m pip install litert-lm
    ```
-2. Download the Gemma 4 E2B model:
+
+2. Start the local LiteRT-LM server on port `9379`:
    ```bash
-   litert-lm download google/gemma-4-e2b
-   ```
-3. Start the local inference server on port `9379`:
-   ```bash
+   # Method A: With activated environment
+   source .venv/bin/activate
    litert-lm serve --model google/gemma-4-e2b --port 9379
+
+   # Method B: Direct path execution (no venv activation needed)
+   ./.venv/bin/litert-lm serve --model google/gemma-4-e2b --port 9379
+   ```
+
+3. Alternatively, serve locally using **Ollama** (OpenAI-compatible local endpoint):
+   ```bash
+   ollama run gemma:2b
    ```
 
 ---
