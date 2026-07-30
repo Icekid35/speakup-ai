@@ -64,34 +64,32 @@ function getAppMode(): 'local' | 'production' {
 }
 
 /**
- * Runtime capability probe — detects whether ffmpeg and faster-whisper
- * are actually available on this machine/server.
- * On Render (after build.sh installs them) this returns true.
- * On Vercel (serverless, read-only) this returns false.
+ * Dynamically resolve binary path (FFmpeg, Python) across macOS & Linux
  */
-const localToolsAvailable: { ffmpeg: boolean; whisper: boolean } = (() => {
-  let ffmpegOk = false;
-  let whisperOk = false;
-  try {
-    execSync(`${(() => {
-      const candidates = ["/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg", "/usr/bin/ffmpeg", "ffmpeg"];
-      for (const c of candidates) { try { execSync(`${c} -version`, { stdio: "ignore", timeout: 3000 }); return c; } catch {} } return "ffmpeg";
-    })()} -version`, { stdio: "ignore", timeout: 3000 });
-    ffmpegOk = true;
-  } catch {}
-  try {
-    const pyBins = [".venv/bin/python3", "python3", "python"];
-    for (const py of pyBins) {
-      try {
-        execSync(`${py} -c "import faster_whisper"`, { stdio: "ignore", timeout: 5000 });
-        whisperOk = true;
-        break;
-      } catch {}
-    }
-  } catch {}
-  console.log(`🔍 Tool probe: ffmpeg=${ffmpegOk}, faster-whisper=${whisperOk}`);
-  return { ffmpeg: ffmpegOk, whisper: whisperOk };
-})();
+function resolveBinary(candidates: string[], testArgs: string = "-version"): string {
+  for (const bin of candidates) {
+    try {
+      execSync(`${bin} ${testArgs}`, { stdio: "ignore", timeout: 3000 });
+      return bin;
+    } catch {}
+  }
+  return candidates[candidates.length - 1];
+}
+
+const FFMPEG_CMD = resolveBinary([
+  "/usr/bin/ffmpeg",
+  "/usr/local/bin/ffmpeg",
+  "/opt/homebrew/bin/ffmpeg",
+  "ffmpeg"
+], "-version");
+
+const PYTHON_CMD = resolveBinary([
+  path.join(process.cwd(), ".venv/bin/python3"),
+  "python3",
+  "python"
+], "--version");
+
+console.log(`🔍 Environment Binary Probe: FFmpeg='${FFMPEG_CMD}', Python='${PYTHON_CMD}'`);
 
 const LITERT_SERVER_URL = getEnvVar("LITERT_SERVER_URL", "http://127.0.0.1:9379");
 const MODEL_NAME = "gemma-4-e2b";
@@ -299,22 +297,7 @@ const EDGE_TTS_BIN = path.join(process.cwd(), ".venv/bin/edge-tts");
 /**
  * Resolve ffmpeg binary — works on macOS Homebrew and Linux (Vercel/Ubuntu)
  */
-function resolveFfmpeg(): string {
-  const candidates = [
-    "/opt/homebrew/bin/ffmpeg",  // macOS Homebrew (Apple Silicon)
-    "/usr/local/bin/ffmpeg",      // macOS Homebrew (Intel)
-    "/usr/bin/ffmpeg",            // Linux (Ubuntu/Debian)
-    "ffmpeg",                     // PATH fallback
-  ];
-  for (const bin of candidates) {
-    try {
-      execSync(`${bin} -version`, { stdio: "ignore", timeout: 3000 });
-      return bin;
-    } catch {}
-  }
-  return "ffmpeg"; // last resort PATH
-}
-const FFMPEG_BIN = resolveFfmpeg();
+
 
 /**
  * Microsoft Edge Neural TTS — genuinely human-sounding voices.
@@ -347,7 +330,7 @@ async function generateNeuralSpeech(text: string): Promise<string> {
       if (result.status === 0 && fs.existsSync(tmpMp3)) {
         // Convert MP3 → WAV 24kHz mono using ffmpeg
         const conv = spawnSync(
-          FFMPEG_BIN,
+          FFMPEG_CMD,
           ["-y", "-i", tmpMp3, "-ar", "24000", "-ac", "1", tmpWav],
           { timeout: 10000 }
         );
@@ -408,7 +391,7 @@ function generatePCMBase64(text: string): string {
       try {
         const r = spawnSync(EDGE_TTS_BIN, ["--voice", voice, "--text", cleanText, "--write-media", tmpMp3], { timeout: 20000 });
         if (r.status === 0 && fs.existsSync(tmpMp3)) {
-          const c = spawnSync(FFMPEG_BIN, ["-y", "-i", tmpMp3, "-ar", "24000", "-ac", "1", tmpWav], { timeout: 10000 });
+          const c = spawnSync(FFMPEG_CMD, ["-y", "-i", tmpMp3, "-ar", "24000", "-ac", "1", tmpWav], { timeout: 10000 });
           try { fs.unlinkSync(tmpMp3); } catch {}
           if (c.status === 0 && fs.existsSync(tmpWav)) {
             const buf = fs.readFileSync(tmpWav);
@@ -459,31 +442,44 @@ function generatePCMBase64(text: string): string {
 
 /**
  * Extract audio from video and run Speech-to-Text ASR for 100% real speech transcription.
- * Fallback order:
- * 1. Local Faster-Whisper (if python & faster-whisper are installed)
- * 2. Cloud Groq Whisper API (if GROQ_API_KEY is configured — sub-second, zero RAM)
- * 3. Cloud Gemini Audio ASR (using GEMINI_API_KEY — native audio transcription)
+ * Multi-stage pipeline with full step-by-step console logging.
  */
 async function extractWhisperTranscript(videoPath: string, userModel?: string): Promise<string> {
+  console.log("\n==================== [SPEECH TRANSCRIPTION PIPELINE INITIATED] ====================");
+  console.log(`📍 Input Video Path: ${videoPath}`);
+
+  if (!fs.existsSync(videoPath)) {
+    console.error("❌ Video file does not exist on disk:", videoPath);
+    console.log("==================================================================================\n");
+    return "";
+  }
+
+  const vidBytes = fs.readFileSync(videoPath).length;
+  console.log(`📦 Input Video Size: ${Math.round(vidBytes / 1024)} KB`);
+
   const id = `${Date.now()}_${Math.floor(Math.random() * 10000)}`;
   const tmpWav = path.join(process.cwd(), `.tmp_whisper_${id}.wav`);
 
+  // Stage 1: Demux audio to 16kHz mono WAV using FFmpeg
+  console.log(`🎥 Stage 1: Demuxing 16kHz mono WAV using FFmpeg (${FFMPEG_CMD})...`);
   try {
-    // Extract clean 16kHz mono PCM audio for Whisper ASR if ffmpeg is available
-    if (localToolsAvailable.ffmpeg) {
-      try {
-        await execAsync(`${FFMPEG_BIN} -y -i "${videoPath}" -vn -ar 16000 -ac 1 "${tmpWav}"`);
-      } catch (e: any) {
-        console.warn("⚠️ Audio extraction warning:", e.message);
-      }
+    execSync(`${FFMPEG_CMD} -y -i "${videoPath}" -vn -ar 16000 -ac 1 "${tmpWav}"`, { timeout: 30000, stdio: "pipe" });
+    if (fs.existsSync(tmpWav)) {
+      const wavBytes = fs.readFileSync(tmpWav).length;
+      console.log(`✅ Stage 1 Success: Audio extracted to ${tmpWav} (${Math.round(wavBytes / 1024)} KB)`);
+    } else {
+      console.warn("⚠️ Stage 1 Warning: FFmpeg finished but WAV file was not found.");
     }
+  } catch (e: any) {
+    console.warn("⚠️ Stage 1 Error: FFmpeg audio demux failed:", e.message);
+  }
 
-    const wavExists = fs.existsSync(tmpWav);
+  const wavExists = fs.existsSync(tmpWav);
 
-    // 1. Local Faster-Whisper (if available)
-    if (localToolsAvailable.whisper && wavExists) {
-      try {
-        const pyScript = `
+  // Stage 2: Faster-Whisper Python ASR
+  if (wavExists) {
+    console.log(`🐍 Stage 2: Running Faster-Whisper Python ASR (${PYTHON_CMD})...`);
+    const pyScript = `
 import sys
 from faster_whisper import WhisperModel
 try:
@@ -492,145 +488,117 @@ try:
     full_text = ' '.join([s.text.strip() for s in segments if s.text])
     print(full_text)
     del model
-except Exception:
-    sys.exit(0)
+except Exception as err:
+    print(f"WHISPER_ERR: {err}", file=sys.stderr)
+    sys.exit(1)
 `;
-        const pyPath = path.join(process.cwd(), `.tmp_py_${id}.py`);
-        fs.writeFileSync(pyPath, pyScript);
+    const pyPath = path.join(process.cwd(), `.tmp_py_${id}.py`);
+    fs.writeFileSync(pyPath, pyScript);
 
-        let pyOut = "";
-        const pyBins = [".venv/bin/python3", "python3", "python"];
-        for (const pyBin of pyBins) {
-          try {
-            const result = await execAsync(`${pyBin} "${pyPath}"`, { timeout: 30000 });
-            pyOut = result.stdout;
-            break;
-          } catch {}
-        }
-        if (fs.existsSync(pyPath)) try { fs.unlinkSync(pyPath); } catch {}
-
-        const transcript = pyOut.trim();
-        if (transcript) {
-          console.log("🎙️ REAL WHISPER TRANSCRIPT (Local ASR):", transcript);
-          return transcript;
-        }
-      } catch (err: any) {
-        console.warn("⚠️ Local Faster-Whisper failed, attempting cloud fallbacks:", err.message);
-      }
+    try {
+      const pyOut = execSync(`${PYTHON_CMD} "${pyPath}"`, { timeout: 90000, encoding: "utf8" });
+      const transcript = pyOut.trim();
+      console.log("✅ Stage 2 Success: Faster-Whisper Speech Recognition Result:");
+      console.log(`   👉 "${transcript || "(Silence detected)"}"`);
+      console.log("==================== [SPEECH TRANSCRIPTION COMPLETE] ====================\n");
+      if (fs.existsSync(pyPath)) try { fs.unlinkSync(pyPath); } catch {}
+      if (fs.existsSync(tmpWav)) try { fs.unlinkSync(tmpWav); } catch {}
+      return transcript;
+    } catch (pyErr: any) {
+      console.warn("⚠️ Stage 2 Warning: Faster-Whisper Python execution failed:");
+      console.warn("   Stderr:", pyErr.stderr || pyErr.message);
+    } finally {
+      if (fs.existsSync(pyPath)) try { fs.unlinkSync(pyPath); } catch {}
     }
-
-    // 2. Cloud Groq Whisper API (if GROQ_API_KEY is configured)
-    const groqApiKey = getEnvVar("GROQ_API_KEY");
-    if (groqApiKey && wavExists) {
-      try {
-        console.log("🎙️ Attempting Cloud Groq Whisper API transcription...");
-        const audioBuffer = fs.readFileSync(tmpWav);
-        const fileBlob = new Blob([audioBuffer], { type: "audio/wav" });
-        const formData = new FormData();
-        formData.append("file", fileBlob, "speech.wav");
-        formData.append("model", "whisper-large-v3-turbo");
-
-        const groqRes = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${groqApiKey.trim()}` },
-          body: formData,
-        });
-
-        if (groqRes.ok) {
-          const data = await groqRes.json();
-          if (data.text && data.text.trim()) {
-            console.log("🎙️ REAL WHISPER TRANSCRIPT (Groq Cloud API):", data.text.trim());
-            return data.text.trim();
-          }
-        } else {
-          console.warn("⚠️ Groq API status:", groqRes.status);
-        }
-      } catch (gErr: any) {
-        console.warn("⚠️ Groq Whisper API error:", gErr.message);
-      }
-    }
-
-    // 3. Cloud Gemini Native Audio ASR (using GEMINI_API_KEY)
-    loadEnvFile();
-    const geminiApiKey = getEnvVar("GEMINI_API_KEY");
-    if (geminiApiKey && wavExists) {
-      try {
-        console.log("🎙️ Attempting Cloud Gemini Native Audio ASR...");
-        const ai = new GoogleGenAI({ apiKey: geminiApiKey.trim() });
-        const audioB64 = fs.readFileSync(tmpWav).toString("base64");
-        const targetModel = userModel || getEnvVar("GEMINI_MODEL", "gemma-4-31b-it");
-        const cloudModel = targetModel === "gemma-4-e2b" ? getEnvVar("GEMINI_MODEL", "gemma-4-31b-it") : targetModel;
-
-        const response = await ai.models.generateContent({
-          model: cloudModel,
-          contents: [
-            { inlineData: { mimeType: "audio/wav", data: audioB64 } },
-            "Provide an exact, word-for-word transcript of everything spoken in this audio file. Return ONLY the spoken transcript text with no extra comments or labels."
-          ]
-        });
-
-        if (response && response.text && response.text.trim()) {
-          const text = response.text.trim();
-          console.log("🎙️ REAL SPEECH TRANSCRIPT (Gemini Audio ASR):", text);
-          return text;
-        }
-      } catch (cErr: any) {
-        console.warn("⚠️ Cloud Gemini Audio ASR failed:", cErr.message);
-      }
-    }
-
-    // 4. Cloud Gemini Direct Video ASR (if ffmpeg was missing/failed but video file exists)
-    if (geminiApiKey && fs.existsSync(videoPath)) {
-      try {
-        console.log("🎙️ Attempting Cloud Gemini Direct Video ASR...");
-        const ai = new GoogleGenAI({ apiKey: geminiApiKey.trim() });
-        const videoB64 = fs.readFileSync(videoPath).toString("base64");
-        const targetModel = userModel || getEnvVar("GEMINI_MODEL", "gemma-4-31b-it");
-        const cloudModel = targetModel === "gemma-4-e2b" ? getEnvVar("GEMINI_MODEL", "gemma-4-31b-it") : targetModel;
-
-        const response = await ai.models.generateContent({
-          model: cloudModel,
-          contents: [
-            { inlineData: { mimeType: "video/mp4", data: videoB64 } },
-            "Provide an exact, word-for-word transcript of everything spoken in this video. Return ONLY the spoken transcript text with no extra comments or labels."
-          ]
-        });
-
-        if (response && response.text && response.text.trim()) {
-          const text = response.text.trim();
-          console.log("🎙️ REAL SPEECH TRANSCRIPT (Gemini Video ASR):", text);
-          return text;
-        }
-      } catch (vErr: any) {
-        console.warn("⚠️ Cloud Gemini Video ASR failed:", vErr.message);
-      }
-    }
-
-    return "";
-  } catch (err: any) {
-    console.warn("⚠️ Speech transcription pipeline failed:", err.message);
-    return "";
-  } finally {
-    if (fs.existsSync(tmpWav)) try { fs.unlinkSync(tmpWav); } catch {}
   }
+
+  // Stage 3: Groq Cloud Whisper API Fallback
+  const groqApiKey = getEnvVar("GROQ_API_KEY");
+  if (groqApiKey && wavExists) {
+    try {
+      console.log("🌐 Stage 3: Calling Cloud Groq Whisper API (whisper-large-v3-turbo)...");
+      const audioBuffer = fs.readFileSync(tmpWav);
+      const fileBlob = new Blob([audioBuffer], { type: "audio/wav" });
+      const formData = new FormData();
+      formData.append("file", fileBlob, "speech.wav");
+      formData.append("model", "whisper-large-v3-turbo");
+
+      const groqRes = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${groqApiKey.trim()}` },
+        body: formData,
+      });
+
+      if (groqRes.ok) {
+        const data = await groqRes.json();
+        if (data.text && data.text.trim()) {
+          console.log(`✅ Stage 3 Success: Groq Cloud Whisper Transcript: "${data.text.trim()}"`);
+          console.log("==================== [SPEECH TRANSCRIPTION COMPLETE] ====================\n");
+          if (fs.existsSync(tmpWav)) try { fs.unlinkSync(tmpWav); } catch {}
+          return data.text.trim();
+        }
+      } else {
+        console.warn("⚠️ Stage 3 Warning: Groq API returned status:", groqRes.status);
+      }
+    } catch (gErr: any) {
+      console.warn("⚠️ Stage 3 Error: Groq Whisper API error:", gErr.message);
+    }
+  }
+
+  // Stage 4: Gemini Multimodal Audio/Video ASR Fallback
+  loadEnvFile();
+  const geminiApiKey = getEnvVar("GEMINI_API_KEY");
+  if (geminiApiKey) {
+    try {
+      console.log("🌐 Stage 4: Calling Google Gemini Multimodal Speech ASR...");
+      const ai = new GoogleGenAI({ apiKey: geminiApiKey.trim() });
+      const targetModel = userModel || getEnvVar("GEMINI_MODEL", "gemma-4-31b-it");
+      const cloudModel = targetModel === "gemma-4-e2b" ? getEnvVar("GEMINI_MODEL", "gemma-4-31b-it") : targetModel;
+
+      let contentPart: any = null;
+      if (wavExists) {
+        contentPart = { inlineData: { mimeType: "audio/wav", data: fs.readFileSync(tmpWav).toString("base64") } };
+      } else if (fs.existsSync(videoPath)) {
+        contentPart = { inlineData: { mimeType: "video/mp4", data: fs.readFileSync(videoPath).toString("base64") } };
+      }
+
+      if (contentPart) {
+        const response = await ai.models.generateContent({
+          model: cloudModel,
+          contents: [
+            contentPart,
+            "Provide an exact, word-for-word transcript of everything spoken in this recording. Return ONLY the spoken transcript text with no extra comments or labels."
+          ]
+        });
+
+        if (response && response.text && response.text.trim()) {
+          console.log(`✅ Stage 4 Success: Gemini Multimodal ASR Transcript: "${response.text.trim()}"`);
+          console.log("==================== [SPEECH TRANSCRIPTION COMPLETE] ====================\n");
+          if (fs.existsSync(tmpWav)) try { fs.unlinkSync(tmpWav); } catch {}
+          return response.text.trim();
+        }
+      }
+    } catch (cErr: any) {
+      console.warn("⚠️ Stage 4 Error: Gemini Multimodal ASR failed:", cErr.message);
+    }
+  }
+
+  if (fs.existsSync(tmpWav)) try { fs.unlinkSync(tmpWav); } catch {}
+  console.log("==================== [SPEECH TRANSCRIPTION FINISHED WITH EMPTY RESULT] ====================\n");
+  return "";
 }
 
 /**
  * Extract key video frames and analyze visual posture/eye contact via configured AI model
  */
 async function extractVisionObservation(videoPath: string, totalDur: number, userModel?: string): Promise<string> {
-  if (!localToolsAvailable.ffmpeg) {
-    console.log("⏭️ Skipping FFmpeg frame extraction — ffmpeg not available on this host");
-    return "";
-  }
-
   const id = `${Date.now()}_${Math.floor(Math.random() * 10000)}`;
   const framePaths: string[] = [];
   try {
-    // Use only 1 frame (the mid-point) at 256px max width, heavy compression for fast local inference
+    // Use 1 frame (mid-point) at 256px max width for vision analysis
     const midTs = Math.max(1, Math.round(totalDur * 0.5));
     const fPath = path.join(process.cwd(), `.tmp_frame_${id}_0.jpg`);
-    await execAsync(`${FFMPEG_BIN} -y -ss ${midTs} -i "${videoPath}" -vframes 1 -vf "scale=256:256:force_original_aspect_ratio=decrease" -q:v 15 "${fPath}"`);
+    await execAsync(`${FFMPEG_CMD} -y -ss ${midTs} -i "${videoPath}" -vframes 1 -vf "scale=256:256:force_original_aspect_ratio=decrease" -q:v 15 "${fPath}"`);
     if (fs.existsSync(fPath)) framePaths.push(fPath);
 
     if (framePaths.length === 0) return "";
@@ -1034,7 +1002,7 @@ async function analyzeWithGeminiCloud(
       for (let i = 0; i < timestamps.length; i++) {
         const fPath = path.join(process.cwd(), `.tmp_cloud_frame_${id}_${i}.jpg`);
         try {
-          execSync(`${FFMPEG_BIN} -y -ss ${timestamps[i]} -i "${tmpVid}" -vframes 1 -q:v 2 "${fPath}"`, { timeout: 10000, stdio: "ignore" });
+          execSync(`${FFMPEG_CMD} -y -ss ${timestamps[i]} -i "${tmpVid}" -vframes 1 -q:v 2 "${fPath}"`, { timeout: 10000, stdio: "ignore" });
           if (fs.existsSync(fPath)) {
             inlineFrames.push({
               inlineData: {
