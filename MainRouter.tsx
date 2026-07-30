@@ -4,7 +4,6 @@ import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { LandingPage } from './pages/LandingPage';
 import { FeaturesPage } from './pages/FeaturesPage';
-import { PricingPage } from './pages/PricingPage';
 import { AboutPage } from './pages/AboutPage';
 import { ContactPage } from './pages/ContactPage';
 import App from './App';
@@ -21,8 +20,6 @@ const MainContent: React.FC = () => {
   let pageComponent = <LandingPage />;
   if (path === '/features') {
     pageComponent = <FeaturesPage />;
-  } else if (path === '/pricing') {
-    pageComponent = <PricingPage />;
   } else if (path === '/about') {
     pageComponent = <AboutPage />;
   } else if (path === '/contact') {

@@ -43,11 +43,6 @@ export const Footer: React.FC = () => {
                 </Link>
               </li>
               <li>
-                <Link to="/pricing" className="hover:text-white transition-colors">
-                  Open Source & Pricing
-                </Link>
-              </li>
-              <li>
                 <Link to="/app" className="hover:text-white transition-colors">
                   AI Practice Examiner
                 </Link>
@@ -118,7 +113,6 @@ export const Footer: React.FC = () => {
           <p>© {new Date().getFullYear()} SpeakUp.ai. Crafted for the Google Gemma 4 Hackathon.</p>
           <div className="flex items-center gap-6">
             <Link to="/about" className="hover:text-slate-400 transition-colors">Mission</Link>
-            <Link to="/pricing" className="hover:text-slate-400 transition-colors">Open Access</Link>
             <Link to="/contact" className="hover:text-slate-400 transition-colors">Support</Link>
           </div>
         </div>
