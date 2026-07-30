@@ -1,4 +1,4 @@
-# 🎙️ SpeakUp.ai
+# SpeakUp.ai
 
 > **Helping people become better speakers with the power of Google Gemma 4.**
 
@@ -36,7 +36,7 @@ Our goal is simple: **Make high-quality communication coaching available to anyo
 
 ---
 
-### ❤️ A Day with SpeakUp.ai
+### A Day with SpeakUp.ai
 
 Sarah has her final-year project defense tomorrow. 
 
@@ -104,14 +104,14 @@ This creates a natural conversation without requiring users to constantly press 
 
 # What SpeakUp.ai Can Do
 
-### 🎤 Presentation Coach
+### Presentation Coach
 Upload a presentation and receive detailed feedback on your speech, delivery, confidence, pacing, body language, and overall communication style.
 
 Instead of simply pointing out mistakes, SpeakUp.ai explains why they matter and suggests practical improvements.
 
 ---
 
-### 🎓 AI Interview & Thesis Examiner
+### AI Interview & Thesis Examiner
 Practice realistic interviews for:
 - Job interviews
 - Final-year project defenses
@@ -123,31 +123,31 @@ The AI responds like a real interviewer by asking follow-up questions based on y
 
 ---
 
-### ✍️ AI Script Improvement
+### AI Script Improvement
 SpeakUp.ai rewrites presentations to make them clearer, more persuasive, and easier to deliver while preserving the speaker's original message and intent.
 
 ---
 
-### 👀 Body Language Analysis
+### Body Language Analysis
 Using Gemma 4's visual reasoning capabilities, SpeakUp.ai evaluates posture, eye contact, facial expressions, and presentation confidence to identify habits that may affect communication.
 
 ---
 
-### 🔊 Spoken AI Feedback
+### Spoken AI Feedback
 At the end of every coaching session, SpeakUp.ai doesn't just display results—it explains them.
 
 Users receive a spoken performance review summarizing their strengths, weaknesses, and personalized recommendations for improvement.
 
 ---
 
-### 💻 Local AI Support
+### Local AI Support
 SpeakUp.ai can run entirely on-device using Google Gemma 4 through LiteRT.
 
 This allows users to practice presentations privately, even without an internet connection, making the application especially useful for students, professionals, and organizations working with sensitive information.
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
 To support real-time audio interaction and local multimodal processing, SpeakUp.ai is divided into a high-performance web client and an edge-capable server pipeline.
 
@@ -210,7 +210,7 @@ We designed the architecture around **minimizing inference roundtrips** and **ma
 
 ---
 
-## 🧠 Inside the AI Pipeline
+## Inside the AI Pipeline
 
 SpeakUp.ai's pipeline behaves like an executive editor and performance coach. Here's a deep-dive look at the engineering under the hood:
 
@@ -241,7 +241,7 @@ During active mock interviews, we maintain an incremental conversational history
 
 ---
 
-## 🔒 Why Local AI Matters
+## Why Local AI Matters
 
 On-device inference is not just a feature—it is a necessity for making technology accessible and private.
 
@@ -252,7 +252,7 @@ On-device inference is not just a feature—it is a necessity for making technol
 
 ---
 
-## 💎 How We Used Gemma 4
+## How We Used Gemma 4
 
 We designed SpeakUp.ai around Gemma 4's key strengths rather than treating the LLM as a generic text box.
 
@@ -265,7 +265,7 @@ We designed SpeakUp.ai around Gemma 4's key strengths rather than treating the L
 
 ---
 
-## 🧪 Technical Implementation
+## Technical Implementation
 
 Below is a directory map showing where crucial features are implemented:
 
@@ -288,13 +288,13 @@ Below is a directory map showing where crucial features are implemented:
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 Follow these step-by-step instructions to run SpeakUp.ai locally on your machine.
 
 ---
 
-### 📋 Prerequisites & System Packages
+### Prerequisites & System Packages
 
 Before running the application, make sure you have the following installed on your system:
 
@@ -338,7 +338,7 @@ Faster-Whisper provides fast, local speech-to-text recognition.
 
 ---
 
-### ⚙️ Step-by-Step Installation
+### Step-by-Step Installation
 
 #### Step 1: Clone the Repository
 ```bash
@@ -373,7 +373,7 @@ NEXT_PUBLIC_GROQ_API_KEY=your_groq_api_key_here
 
 ---
 
-### 🤖 Running Local Gemma 4 (Optional — for Offline On-Device Mode)
+### Running Local Gemma 4 (Optional — for Offline On-Device Mode)
 
 If you want to run **Google Gemma 4** completely offline on your device:
 
@@ -392,7 +392,7 @@ If you want to run **Google Gemma 4** completely offline on your device:
 
 ---
 
-### 💻 Launching the Application
+### Launching the Application
 
 Start the local server and dev environment:
 ```bash
@@ -403,7 +403,7 @@ Open **`http://localhost:3000`** in your browser.
 
 ---
 
-## 🌍 Future Vision
+## Future Vision
 
 We want to expand SpeakUp.ai beyond basic presentation coaching:
 
@@ -415,5 +415,5 @@ We want to expand SpeakUp.ai beyond basic presentation coaching:
 
 ---
 
-## 📝 License
+## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
