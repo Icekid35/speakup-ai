@@ -81,14 +81,13 @@ function App() {
 
     const progressInterval = setInterval(() => {
       setAnalysisProgress(prev => {
-        if (prev >= 90) {
-          clearInterval(progressInterval);
-          return 90;
+        if (prev >= 98) {
+          return 98;
         }
-        const increment = prev < 30 ? 5 : prev < 60 ? 3 : prev < 80 ? 2 : 1;
-        return Math.min(90, prev + increment);
+        const increment = prev < 30 ? 5 : prev < 60 ? 3 : prev < 85 ? 2 : 1;
+        return Math.min(98, prev + increment);
       });
-    }, 800);
+    }, 700);
 
     try {
       const dur = videoDuration && !isNaN(videoDuration) && videoDuration > 0 ? Math.round(videoDuration) : 60;

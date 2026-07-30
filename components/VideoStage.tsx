@@ -42,6 +42,31 @@ export const VideoStage: React.FC<VideoStageProps> = ({
   const [showFirstTimeHint, setShowFirstTimeHint] = useState(false);
   const [previousSegmentId, setPreviousSegmentId] = useState<string | null>(null);
   const [videoAspectRatio, setVideoAspectRatio] = useState<number | null>(null);
+  const [tipIndex, setTipIndex] = useState(0);
+
+  const executiveTips = [
+    "A 2-second deliberate pause before answering hard questions projects immense executive presence.",
+    "Maintain steady eye contact with one person per thought to build genuine audience connection.",
+    "Replace filler words ('um', 'like', 'you know') with a silent, confident breath.",
+    "Use strong active phrasing: 'We engineered the solution' instead of 'A solution was created'.",
+    "Vary your speech cadence—slow down for key thesis points, speed up slightly for supporting stories.",
+    "Upright shoulder posture increases vocal resonance and improves perceived credibility."
+  ];
+
+  useEffect(() => {
+    if (!isAnalyzing) return;
+    const interval = setInterval(() => {
+      setTipIndex(prev => (prev + 1) % executiveTips.length);
+    }, 4500);
+    return () => clearInterval(interval);
+  }, [isAnalyzing]);
+
+  const getStageDetail = () => {
+    if (analysisProgress < 25) return "Extracting audio waveform & demuxing vision keyframes...";
+    if (analysisProgress < 55) return "Running Faster-Whisper speech-to-text recognition...";
+    if (analysisProgress < 85) return "Evaluating eye contact alignment & posture stability...";
+    return "Google Gemma 4 generating multimodal executive feedback & script rewrites...";
+  };
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -378,6 +403,47 @@ export const VideoStage: React.FC<VideoStageProps> = ({
 
         {/* RIGHT COLUMN: AI Diagnostics & Script Rewrites Panel (lg:col-span-5) */}
         <div className="lg:col-span-5 flex flex-col gap-4">
+          {/* Minimalist AI Processing & Executive Tips Card */}
+          {isAnalyzing && (
+            <div className="bg-white border border-indigo-100 rounded-2xl p-5 shadow-sm space-y-4 animate-fade-in">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+                    <Sparkles className="w-4 h-4 animate-spin" />
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="text-xs font-bold text-slate-900 flex items-center gap-2 font-mono">
+                      <span>Analyzing Presentation</span>
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                    </h4>
+                    <p className="text-[11px] text-indigo-600 font-mono font-medium truncate">
+                      {getStageDetail()}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-xs font-mono font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100 shrink-0">
+                  {analysisProgress}%
+                </span>
+              </div>
+
+              {/* Smooth Progress Bar */}
+              <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                <div
+                  className="bg-indigo-600 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${analysisProgress}%` }}
+                />
+              </div>
+
+              {/* Rotating Executive Speaking Tip */}
+              <div className="pt-2 border-t border-slate-100 flex items-start gap-2 text-xs text-slate-600 font-sans">
+                <span className="text-amber-500 font-bold shrink-0">💡</span>
+                <p className="leading-relaxed transition-all duration-300">
+                  {executiveTips[tipIndex]}
+                </p>
+              </div>
+            </div>
+          )}
+
           {analysis && currentSegment ? (
             <>
               {/* Script Doctor & Segment Review Card */}
