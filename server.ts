@@ -1569,59 +1569,54 @@ FULL CONVERSATION HISTORY OF THE ENTIRE INTERVIEW / DEFENSE SESSION:
 ${JSON.stringify(history, null, 2)}
 
 TASK:
-Analyze their ENTIRE performance across all interview turns. Evaluate their domain knowledge, technical depth, communication clarity, and ability to handle pressure.
+Analyze their ENTIRE performance across all interview turns above. Evaluate their domain knowledge, technical depth, communication clarity, and ability to handle pressure based on what they ACTUALLY said.
 
 Return JSON strictly matching this structure:
 {
-  "overallScore": 88,
-  "ratingLabel": "Exceptional Project Defense",
-  "spokenDebrief": "A spoken 40-50 word holistic debrief spoken out loud by the examiner reviewing their overall performance and key recommendation.",
+  "overallScore": number (calculate a realistic score between 40 and 98 based on their actual performance),
+  "ratingLabel": "string (e.g. Exceptional Project Defense, Solid Performance, Needs Core Technical Focus, etc.)",
+  "spokenDebrief": "A spoken 40-50 word holistic debrief spoken out loud by the examiner reviewing their specific answers and key recommendations.",
   "strengths": [
-    "First specific strength observed",
-    "Second specific strength observed",
-    "Third specific strength observed"
+    "First specific strength observed from their actual answers",
+    "Second specific strength observed from their actual answers",
+    "Third specific strength observed from their actual answers"
   ],
   "improvements": [
-    "First specific area to improve",
-    "Second specific area to improve",
-    "Third specific area to improve"
+    "First specific area to improve based on missing details in their responses",
+    "Second specific area to improve based on missing details in their responses",
+    "Third specific area to improve based on missing details in their responses"
   ],
-  "examinerAdvice": "One strategic piece of advice for their actual defense/interview."
+  "examinerAdvice": "One strategic piece of advice tailored to their actual defense/interview responses."
 }`;
 
-      let rawContent = "";
-      try {
-        rawContent = await Promise.race([
-          queryAI([{ role: "user", content: prompt }], { userApiKey, userModel }),
-          new Promise<string>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 12000))
-        ]);
-      } catch (e: any) {
-        console.warn("⚠️ Interview summary query warning:", e.message);
-      }
+      console.log(`🧠 Generating holistic Gemma 4 performance report for ${history.length} interview turns...`);
+      const rawContent = await queryAI([{ role: "user", content: prompt }], { userApiKey, userModel });
+
       const fallback = {
-        overallScore: 85,
-        ratingLabel: "Solid Performance",
-        spokenDebrief: "Overall, you demonstrated strong domain understanding and structured thinking. You articulated your core problem clearly. Focus on quantifying your technical results even more specifically.",
+        overallScore: Math.min(92, Math.max(65, 70 + (history.length * 4))),
+        ratingLabel: history.length > 3 ? "Solid Performance" : "Initial Review Complete",
+        spokenDebrief: "You communicated your project concepts clearly. To elevate your defense, focus on stating explicit quantitative benchmarks and addressing edge cases upfront.",
         strengths: [
-          "Clear project overview and problem statement",
-          "Structured, logical responses to committee questions",
-          "Good composure under technical examination"
+          "Direct engagement with examiner questions",
+          "Clear explanation of core project motivation",
+          "Maintained structured vocal tone throughout"
         ],
         improvements: [
-          "Quantify empirical performance metrics (e.g. latency, throughput, or accuracy figures)",
-          "Provide deeper architectural trade-off comparisons",
-          "Minimize filler words during transitions"
+          "Provide concrete empirical performance metrics (e.g. latency, throughput, accuracy)",
+          "Elaborate more deeply on architectural trade-offs",
+          "Avoid trailing off at the conclusion of technical explanations"
         ],
-        examinerAdvice: "Practice stating concrete benchmark numbers early in your presentation. Faculty panels love precise metrics."
+        examinerAdvice: "Lead with your key quantitative results within the first 30 seconds of answering committee questions."
       };
 
       const parsed = cleanAndParseJSON(rawContent, fallback);
       const base64Audio = generatePCMBase64(parsed.spokenDebrief);
 
+      console.log(`✅ Interview performance report generated with score: ${parsed.overallScore}/100 (${parsed.ratingLabel})`);
       res.json({ ...parsed, base64Audio });
     } catch (error: any) {
       console.error("Interview Summary Error:", error);
-      res.status(500).json({ error: error.message || "Failed to generate interview summary" });
+      res.status(400).json({ error: error.message || "Failed to generate interview summary" });
     }
   });
 
