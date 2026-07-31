@@ -114,8 +114,6 @@ function App() {
       
       clearInterval(progressInterval);
       setAnalysisProgress(100);
-      
-      await new Promise(r => setTimeout(r, 500));
 
       const initializedResult = {
         ...result,

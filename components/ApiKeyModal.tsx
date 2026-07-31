@@ -112,7 +112,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
 
         setSaved(true);
         onKeySaved();
-        setTimeout(() => { onClose(); }, 600);
+        onClose();
       } else {
         setErrorMsg(data.error || 'Model verification failed.');
       }
