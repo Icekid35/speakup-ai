@@ -146,9 +146,10 @@ export const AIInterviewStage: React.FC<AIInterviewStageProps> = ({ onExit }) =>
       setCoachTip(res.coachTip);
       if (res.base64Audio) playQuestionAudio(res.base64Audio);
       else { setIsEvaluating(false); initSpeechRecognition(); }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to start interview:', err);
-      alert('Could not access microphone or fetch initial question.');
+      const msg = err?.message || 'Could not fetch initial question.';
+      alert(`Interview Error: ${msg}`);
       setIsEvaluating(false);
     }
   };
@@ -205,8 +206,10 @@ export const AIInterviewStage: React.FC<AIInterviewStageProps> = ({ onExit }) =>
       setUserTranscript(''); setIsSpeechEndDetected(false);
       if (res.base64Audio) playQuestionAudio(res.base64Audio);
       else { setIsEvaluating(false); initSpeechRecognition(); }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error submitting answer:', err);
+      const msg = err?.message || 'Failed to submit answer.';
+      alert(`Interview Step Error: ${msg}`);
       setIsEvaluating(false); initSpeechRecognition();
     }
   };

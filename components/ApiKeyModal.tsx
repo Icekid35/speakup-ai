@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Key, Shield, Sparkles, X, Check, Cpu, AlertTriangle, Loader2, Info } from 'lucide-react';
+import { Key, Shield, Sparkles, X, Check, Cpu, AlertTriangle, Loader2, ExternalLink, Eye, EyeOff } from 'lucide-react';
 
 interface ApiKeyModalProps {
   isOpen: boolean;
@@ -15,7 +15,10 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
   initialMessage
 }) => {
   const [model, setModel] = useState('gemma-4-31b-it');
+  const [apiKey, setApiKey] = useState('');
+  const [showApiKey, setShowApiKey] = useState(false);
   const [appMode, setAppMode] = useState<'local' | 'production'>('local');
+  const [hasEnvApiKey, setHasEnvApiKey] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [saved, setSaved] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -26,11 +29,15 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
       setSaved(false);
       setIsValidating(false);
 
+      const storedKey = localStorage.getItem('speakup_gemini_api_key') || localStorage.getItem('aura_gemini_api_key') || '';
+      setApiKey(storedKey);
+
       fetch('/api/config')
         .then(res => res.json())
         .then(data => {
           const mode = data.appMode || 'local';
           setAppMode(mode);
+          setHasEnvApiKey(!!data.hasEnvApiKey);
 
           const storedModel = localStorage.getItem('speakup_gemini_model') || localStorage.getItem('aura_gemini_model');
           const validModels = ['gemma-4-e2b', 'gemma-4-31b-it', 'gemma-4-26b-a4b-it'];
@@ -68,6 +75,14 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
       return;
     }
 
+    const keyToValidate = apiKey.trim();
+
+    // If cloud model selected, check if we have either a user key or an env key
+    if (model !== 'gemma-4-e2b' && !keyToValidate && !hasEnvApiKey) {
+      setErrorMsg('Google Gemini API Key is required. Please paste your API key from Google AI Studio.');
+      return;
+    }
+
     setIsValidating(true);
     setErrorMsg(null);
 
@@ -75,17 +90,25 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
       const res = await fetch('/api/validate-key', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model })
+        body: JSON.stringify({ model, apiKey: keyToValidate })
       });
 
       const data = await res.json();
 
       if (res.ok && data.valid) {
+        if (keyToValidate) {
+          localStorage.setItem('speakup_gemini_api_key', keyToValidate);
+          localStorage.setItem('aura_gemini_api_key', keyToValidate);
+        } else {
+          localStorage.removeItem('speakup_gemini_api_key');
+          localStorage.removeItem('aura_gemini_api_key');
+        }
+
         localStorage.setItem('speakup_gemini_model', model);
         localStorage.setItem('aura_gemini_model', model);
 
+        window.dispatchEvent(new CustomEvent('speakup_api_key_changed', { detail: { apiKey: keyToValidate } }));
         window.dispatchEvent(new CustomEvent('speakup_model_changed', { detail: { model } }));
-        window.dispatchEvent(new CustomEvent('aura_model_changed', { detail: { model } }));
 
         setSaved(true);
         onKeySaved();
@@ -108,11 +131,11 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
         <div className="flex items-center justify-between mb-5 border-b border-slate-100 pb-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
-              <Cpu className="w-5 h-5" />
+              <Key className="w-5 h-5" />
             </div>
             <div>
               <h2 className="text-base font-mono font-bold text-slate-900">
-                AI Model Selection
+                API Key & Model Settings
               </h2>
               <p className="text-xs text-slate-500">
                 Environment: <span className="text-indigo-600 font-mono font-bold uppercase">{appMode}</span>
@@ -132,7 +155,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
           <div className="mb-5 bg-rose-50 border border-rose-200 rounded-2xl p-3.5 flex items-start gap-3 text-rose-700">
             <AlertTriangle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
             <div className="text-xs leading-relaxed font-sans">
-              <span className="font-bold text-rose-800">Error: </span>
+              <span className="font-bold text-rose-800">Notice: </span>
               {errorMsg}
             </div>
           </div>
@@ -151,15 +174,55 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
 
         {/* Form Body */}
         <div className="space-y-5 mb-6">
+
+          {/* API Key Input Section (shown for cloud models or optional override) */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-mono font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                <Key className="w-3.5 h-3.5 text-indigo-600" /> Google Gemini API Key
+              </label>
+              <a
+                href="https://aistudio.google.com/app/apikey"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-[11px] font-mono text-indigo-600 hover:text-indigo-700 font-semibold hover:underline"
+              >
+                <span>Get key at AI Studio</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+
+            <div className="relative">
+              <input
+                type={showApiKey ? 'text' : 'password'}
+                value={apiKey}
+                onChange={(e) => { setApiKey(e.target.value); setErrorMsg(null); }}
+                placeholder={hasEnvApiKey ? "Pre-configured in .env (or paste custom key here)" : "Paste your Gemini API key (AIzaSy...)"}
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-4 pr-10 py-3 text-xs font-mono text-slate-900 focus:outline-none focus:border-indigo-500 transition-colors placeholder:text-slate-400"
+              />
+              <button
+                type="button"
+                onClick={() => setShowApiKey(!showApiKey)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 transition-colors"
+                title={showApiKey ? "Hide API key" : "Show API key"}
+              >
+                {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1.5 font-sans leading-normal">
+              Your API key is saved securely in your browser's local storage and used directly for Google Gemma AI requests.
+            </p>
+          </div>
+
           {/* Model Selection Dropdown */}
           <div>
-            <label className="block text-xs font-mono font-bold text-indigo-600 uppercase tracking-wider mb-2 flex items-center gap-2">
-              <Cpu className="w-3.5 h-3.5" /> Select Active Gemma Model
+            <label className="block text-xs font-mono font-bold text-slate-900 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <Cpu className="w-3.5 h-3.5 text-indigo-600" /> Select Active Gemma Model
             </label>
             <select
               value={model}
               onChange={(e) => { setModel(e.target.value); setErrorMsg(null); }}
-              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm text-slate-900 focus:outline-none focus:border-indigo-400 font-mono transition-colors"
+              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-xs text-slate-900 focus:outline-none focus:border-indigo-500 font-mono transition-colors"
             >
               <option value="gemma-4-31b-it">Gemma 4 31B IT (Recommended — Cloud API)</option>
               <option value="gemma-4-26b-a4b-it">Gemma 4 26B A4B IT (Cloud API)</option>
@@ -167,13 +230,6 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
             </select>
           </div>
 
-          {/* Automatic API Key Status Notice */}
-          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 flex items-start gap-3">
-            <Shield className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-            <div className="text-xs text-slate-600 leading-relaxed">
-              <span className="font-bold text-slate-800">API Credentials Pre-configured:</span> API authentication is handled automatically via environment configuration (<code className="text-indigo-600">.env</code>).
-            </div>
-          </div>
         </div>
 
         {/* Footer Actions */}
@@ -197,7 +253,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
             ) : (
               <Sparkles className="w-4 h-4" />
             )}
-            {isValidating ? 'Saving...' : saved ? 'Saved!' : 'Save & Apply'}
+            {isValidating ? 'Verifying Key...' : saved ? 'Saved!' : 'Save & Verify'}
           </button>
         </div>
       </div>

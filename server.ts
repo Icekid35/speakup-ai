@@ -145,7 +145,7 @@ async function queryAI(
   options?: { userApiKey?: string; userModel?: string; systemInstruction?: string }
 ): Promise<string> {
   loadEnvFile();
-  const apiKey = getEnvVar("GEMINI_API_KEY");
+  const apiKey = (options?.userApiKey && options.userApiKey.trim()) || getEnvVar("GEMINI_API_KEY");
   const appMode = getAppMode();
   
   // ALWAYS honor options?.userModel if passed! Fallback to env GEMINI_MODEL or gemma-4-31b-it.
@@ -160,7 +160,7 @@ async function queryAI(
   if (targetModel !== "gemma-4-e2b" || appMode === "production") {
     const cloudModel = (targetModel === "gemma-4-e2b") ? getEnvVar("GEMINI_MODEL", "gemma-4-31b-it") : targetModel;
     if (!apiKey || !apiKey.trim()) {
-      throw new Error("NEXT_PUBLIC_GEMINI_API_KEY or GEMINI_API_KEY is not configured in your .env / .env.local file.");
+      throw new Error("Gemini API Key is required. Please enter your API key or configure GEMINI_API_KEY in .env.");
     }
     console.log(`\n==================== [CLOUD GEMINI MODEL REQUEST: ${cloudModel}] ====================`);
     try {
@@ -180,10 +180,15 @@ async function queryAI(
       return text;
     } catch (cloudErr: any) {
       console.error(`❌ Cloud Gemini API Error (${cloudModel}):`, cloudErr.message);
-      if (cloudErr.message && (cloudErr.message.includes("leaked") || cloudErr.message.includes("PERMISSION_DENIED"))) {
-        throw new Error("The GEMINI_API_KEY in your .env file was reported as leaked and revoked by Google. Please update GEMINI_API_KEY in your .env file with a fresh key from aistudio.google.com");
+      let msg = cloudErr.message || "Unknown Cloud API error";
+      if (msg.includes("leaked") || msg.includes("PERMISSION_DENIED")) {
+        msg = "The API key was reported as leaked and revoked by Google. Please enter a fresh key from aistudio.google.com";
+      } else if (msg.includes("API_KEY_INVALID") || msg.includes("400") || msg.includes("401") || msg.includes("403")) {
+        msg = "Invalid Gemini API Key. Please check your key at aistudio.google.com";
+      } else if (msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED")) {
+        msg = `Quota or rate limit exceeded for ${cloudModel}. Please try another model or check billing at aistudio.google.com`;
       }
-      throw new Error(`Cloud Gemini API Error (${cloudModel}): ${cloudErr.message}`);
+      throw new Error(msg);
     }
   }
 
@@ -591,22 +596,20 @@ except Exception as err:
 /**
  * Extract key video frames and analyze visual posture/eye contact via configured AI model
  */
-async function extractVisionObservation(videoPath: string, totalDur: number, userModel?: string): Promise<string> {
+async function extractVisionObservation(videoPath: string, totalDur: number, userModel?: string, userApiKey?: string): Promise<string> {
   const id = `${Date.now()}_${Math.floor(Math.random() * 10000)}`;
   const framePaths: string[] = [];
   try {
     // Use 1 frame (mid-point) at 256px max width for vision analysis
     const midTs = Math.max(1, Math.round(totalDur * 0.5));
     const fPath = path.join(process.cwd(), `.tmp_frame_${id}_0.jpg`);
-    await execAsync(`${FFMPEG_CMD} -y -ss ${midTs} -i "${videoPath}" -vframes 1 -vf "scale=256:256:force_original_aspect_ratio=decrease" -q:v 15 "${fPath}"`);
+    execSync(`${FFMPEG_CMD} -y -ss ${midTs} -i "${videoPath}" -vframes 1 -vf "scale='min(256,iw)':-1" -q:v 4 "${fPath}"`, { timeout: 10000, stdio: "ignore" });
     if (fs.existsSync(fPath)) framePaths.push(fPath);
 
     if (framePaths.length === 0) return "";
 
-    // Keep base64 small - 256px + q:15 should be under 8KB
     const b64 = fs.readFileSync(framePaths[0]).toString("base64");
-    const kbSize = Math.round(b64.length / 1024);
-    console.log(`👁️ Vision frame size: ${kbSize}KB`);
+    try { fs.unlinkSync(framePaths[0]); } catch {}
 
     const visionPrompt = [
       { type: "image_url", image_url: { url: `data:image/jpeg;base64,${b64}` } },
@@ -616,7 +619,7 @@ async function extractVisionObservation(videoPath: string, totalDur: number, use
       }
     ];
 
-    const obs = await queryAI([{ role: "user", content: visionPrompt }], { userModel });
+    const obs = await queryAI([{ role: "user", content: visionPrompt }], { userApiKey, userModel });
     console.log("👁️ VISION OBSERVATION:", obs.slice(0, 200));
     return obs;
   } catch (err: any) {
@@ -1169,7 +1172,8 @@ Return ONLY valid JSON with this exact structure:
   app.post("/api/validate-key", async (req, res) => {
     try {
       loadEnvFile();
-      const { model } = req.body;
+      const { model, apiKey: bodyApiKey, userApiKey } = req.body;
+      const headerApiKey = req.headers['x-gemini-api-key'] as string;
       const appMode = getAppMode();
 
       if (!model) {
@@ -1205,10 +1209,10 @@ Return ONLY valid JSON with this exact structure:
         }
       }
 
-      // Cloud Model Validation strictly using environment API key from .env / .env.local
-      const apiKey = getEnvVar("GEMINI_API_KEY");
+      // Cloud Model Validation: Use user-provided API key first, fallback to .env key
+      const apiKey = (bodyApiKey && bodyApiKey.trim()) || (userApiKey && userApiKey.trim()) || (headerApiKey && headerApiKey.trim()) || getEnvVar("GEMINI_API_KEY");
       if (!apiKey || !apiKey.trim()) {
-        return res.status(400).json({ valid: false, error: "NEXT_PUBLIC_GEMINI_API_KEY or GEMINI_API_KEY is not configured in your .env / .env.local file." });
+        return res.status(400).json({ valid: false, error: "Gemini API Key is required. Please paste your API key from Google AI Studio." });
       }
 
       const ai = new GoogleGenAI({ apiKey: apiKey.trim() });
@@ -1218,7 +1222,7 @@ Return ONLY valid JSON with this exact structure:
       });
 
       if (response && response.text !== undefined) {
-        return res.json({ valid: true, model, message: "Model verified successfully using .env key!" });
+        return res.json({ valid: true, model, message: "Model & API Key verified successfully!" });
       } else {
         return res.status(400).json({ valid: false, error: "Model returned an empty response. Verify model availability." });
       }
@@ -1226,9 +1230,11 @@ Return ONLY valid JSON with this exact structure:
       console.error("❌ Key Validation Error:", err.message);
       let userFriendlyMsg = err.message || "Model verification failed.";
       if (userFriendlyMsg.includes("leaked") || userFriendlyMsg.includes("PERMISSION_DENIED")) {
-        userFriendlyMsg = "The GEMINI_API_KEY in your .env file was reported as leaked and revoked by Google. Please update GEMINI_API_KEY in your .env file with a fresh key from aistudio.google.com.";
+        userFriendlyMsg = "The API key was reported as leaked and revoked by Google. Please enter a fresh key from aistudio.google.com.";
       } else if (userFriendlyMsg.includes("API_KEY_INVALID") || userFriendlyMsg.includes("400") || userFriendlyMsg.includes("401") || userFriendlyMsg.includes("403")) {
-        userFriendlyMsg = "Invalid API Key in .env file. Please check your credentials at aistudio.google.com.";
+        userFriendlyMsg = "Invalid Gemini API Key. Please check your credentials at aistudio.google.com.";
+      } else if (userFriendlyMsg.includes("429") || userFriendlyMsg.includes("RESOURCE_EXHAUSTED")) {
+        userFriendlyMsg = `Quota or rate limit exceeded for model ${req.body.model || 'Gemma'}. Please try another model or check billing at aistudio.google.com`;
       }
       return res.status(400).json({ valid: false, error: userFriendlyMsg });
     }
@@ -1257,7 +1263,7 @@ Return ONLY valid JSON with this exact structure:
           if (wText) realTranscript = wText;
 
           // 2. Extract real visual evaluation using the user-selected AI model
-          realVisionObs = await extractVisionObservation(tmpVid, totalDur, userModel);
+          realVisionObs = await extractVisionObservation(tmpVid, totalDur, userModel, userApiKey);
         } catch (e: any) {
           console.warn("⚠️ Local video processing warning:", e.message);
         } finally {
@@ -1275,7 +1281,7 @@ Return ONLY valid JSON with this exact structure:
           }
         ];
         try {
-          realVisionObs = await queryAI([{ role: "user", content: visionPrompt }], { userModel });
+          realVisionObs = await queryAI([{ role: "user", content: visionPrompt }], { userApiKey, userModel });
           console.log("👁️ CLIENT FRAME VISION OBSERVATION:", realVisionObs.slice(0, 200));
         } catch (e: any) {
           console.warn("⚠️ Client frame vision evaluation failed:", e.message);
@@ -1367,7 +1373,7 @@ Return ONLY valid JSON. Do not include markdown code block formatting.`;
         let parsed: any = null;
         try {
           // Route through queryAI so user-selected model is always honored
-          const raw = await queryAI([{ role: "user", content: holisticPrompt }], { userModel });
+          const raw = await queryAI([{ role: "user", content: holisticPrompt }], { userApiKey, userModel });
           parsed = cleanAndParseJSON(raw, null);
         } catch (gemmaErr) {
           console.warn("⚠️ Holistic AI analysis failed, using dynamic builder:", gemmaErr);
@@ -1406,8 +1412,7 @@ Return single-segment JSON.`;
       }
     } catch (error: any) {
       console.error("Gemma Analysis Server Error:", error);
-      const totalDur = Math.max(10, Math.round(Number(req.body.videoDuration) || 60));
-      res.json(buildFullTimelineAnalysis(totalDur, req.body.transcript, req.body.mode));
+      res.status(400).json({ error: error.message || "Video analysis failed on server" });
     }
   });
 
@@ -1451,7 +1456,7 @@ Write ONLY the spoken script — no labels, no quotes:`;
       res.json({ script });
     } catch (error: any) {
       console.error("Debrief Script Server Error:", error);
-      res.json({ script: "Great effort! Maintain high energy, check your posture, and command the room." });
+      res.status(400).json({ error: error.message || "Failed to generate debrief script" });
     }
   });
 
@@ -1549,7 +1554,7 @@ Return JSON strictly:
       res.json({ ...parsed, base64Audio });
     } catch (error: any) {
       console.error("Interview Step Error:", error);
-      res.status(500).json({ error: error.message || "Failed interview evaluation" });
+      res.status(400).json({ error: error.message || "Failed interview evaluation" });
     }
   });
 

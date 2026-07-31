@@ -48,9 +48,10 @@ export const ScriptDoctorModal: React.FC<ScriptDoctorModalProps> = ({
     try {
       const res = await fetchScriptDoctor(rawDraft, audience);
       setResult(res);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Script Doctor Error:', err);
-      alert('Could not process script. Check your connection and try again.');
+      const msg = err?.message || 'Could not process script. Check your connection and try again.';
+      alert(`Script Doctor Error: ${msg}`);
     } finally {
       setIsLoading(false);
     }

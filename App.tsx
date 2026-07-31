@@ -29,6 +29,16 @@ function App() {
 
   const [coachScript, setCoachScript] = useState<string | null>(null);
   const [coachAudio, setCoachAudio] = useState<Blob | null>(null);
+  const [hasEnvApiKey, setHasEnvApiKey] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/config')
+      .then(res => res.json())
+      .then(data => {
+        setHasEnvApiKey(!!data.hasEnvApiKey);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (analysis && analysis.segments && !seekTime) {
@@ -73,6 +83,15 @@ function App() {
 
   const handleAnalyze = async (videoDuration?: number) => {
     if (!videoBlob) return;
+
+    const userKey = localStorage.getItem('speakup_gemini_api_key') || localStorage.getItem('aura_gemini_api_key');
+    const selectedModel = localStorage.getItem('speakup_gemini_model') || 'gemma-4-31b-it';
+
+    if (selectedModel !== 'gemma-4-e2b' && !userKey && !hasEnvApiKey) {
+      setApiKeyModalNotice("Google Gemini API Key required. Please enter your API Key from Google AI Studio to run video analysis.");
+      setIsApiKeyModalOpen(true);
+      return;
+    }
 
     setIsAnalyzing(true);
     setAnalysisProgress(0);
@@ -123,9 +142,15 @@ function App() {
         }
       }).catch(e => console.error("Coach background gen failed", e));
 
-    } catch (error) {
+    } catch (error: any) {
       clearInterval(progressInterval);
-      alert("Analysis failed. See console for details.");
+      const msg = error?.message || "Analysis failed.";
+      if (error?.isApiKeyError || msg.toLowerCase().includes("key") || msg.toLowerCase().includes("unauthorized") || msg.toLowerCase().includes("revoked")) {
+        setApiKeyModalNotice(msg);
+        setIsApiKeyModalOpen(true);
+      } else {
+        alert(`Video Analysis Error: ${msg}`);
+      }
       setIsAnalyzing(false);
       setAnalysisProgress(0);
     }

@@ -13,9 +13,40 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
   });
 };
 
-const getUserModel = (): string | undefined => {
+export const getUserModel = (): string | undefined => {
   if (typeof window === 'undefined') return undefined;
   return localStorage.getItem('speakup_gemini_model') || localStorage.getItem('aura_gemini_model') || undefined;
+};
+
+export const getSavedApiKey = (): string | undefined => {
+  if (typeof window === 'undefined') return undefined;
+  return localStorage.getItem('speakup_gemini_api_key') || localStorage.getItem('aura_gemini_api_key') || undefined;
+};
+
+const buildHeaders = (): Record<string, string> => {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const key = getSavedApiKey();
+  if (key) {
+    headers["x-gemini-api-key"] = key;
+  }
+  return headers;
+};
+
+const handleFetchError = async (res: Response, fallbackMsg: string): Promise<never> => {
+  const data = await res.json().catch(() => ({ error: `${fallbackMsg} (Status ${res.status})` }));
+  const errMsg = data.error || `${fallbackMsg} (Status ${res.status})`;
+  const err: any = new Error(errMsg);
+  if (
+    res.status === 401 ||
+    res.status === 403 ||
+    errMsg.toLowerCase().includes("api key") ||
+    errMsg.toLowerCase().includes("key required") ||
+    errMsg.toLowerCase().includes("unauthorized") ||
+    errMsg.toLowerCase().includes("revoked")
+  ) {
+    err.isApiKeyError = true;
+  }
+  throw err;
 };
 
 export const extractVideoFramesClient = (blob: Blob, frameCount: number = 5): Promise<string[]> => {
@@ -92,46 +123,42 @@ export const analyzeVideo = async (
 
   const res = await fetch("/api/analyze", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: buildHeaders(),
     body: JSON.stringify({
       videoBase64,
       mimeType: blob.type || "video/mp4",
       mode,
       context,
       videoDuration: dur,
+      userApiKey: getSavedApiKey(),
       userModel: getUserModel(),
     }),
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: "Analysis failed" }));
-    throw new Error(err.error || "Failed to analyze video");
+    await handleFetchError(res, "Video analysis failed");
   }
 
   return await res.json();
 };
 
 export const generateDebriefScript = async (analysis: SpeakUpAnalysis): Promise<string> => {
-  try {
-    const res = await fetch("/api/debrief-script", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        analysis,
-        userModel: getUserModel(),
-      }),
-    });
+  const res = await fetch("/api/debrief-script", {
+    method: "POST",
+    headers: buildHeaders(),
+    body: JSON.stringify({
+      analysis,
+      userApiKey: getSavedApiKey(),
+      userModel: getUserModel(),
+    }),
+  });
 
-    if (!res.ok) {
-      throw new Error("Failed to generate debrief script");
-    }
-
-    const data = await res.json();
-    return data.script || "Your voice is flat and you look nervous. Sit up straight, take a deep breath, and say it like you mean it. Try again.";
-  } catch (error) {
-    console.error("Script Gen Error:", error);
-    return "Great effort, but you need more energy. Check your posture and try again.";
+  if (!res.ok) {
+    await handleFetchError(res, "Failed to generate debrief script");
   }
+
+  const data = await res.json();
+  return data.script || "Your voice dropped right when it mattered most. Sit up straight, take a deep breath, and say it like you mean it.";
 };
 
 export interface InterviewStepResponse {
@@ -154,18 +181,21 @@ export const fetchInterviewStep = async (
 ): Promise<InterviewStepResponse> => {
   const res = await fetch("/api/interview-step", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: buildHeaders(),
     body: JSON.stringify({
       role,
       companyTier,
       history,
       lastUserTranscript,
+      userApiKey: getSavedApiKey(),
       userModel: getUserModel(),
     }),
   });
+
   if (!res.ok) {
-    throw new Error("Failed to process interview turn");
+    await handleFetchError(res, "Failed to process interview turn");
   }
+
   return await res.json();
 };
 
@@ -186,17 +216,20 @@ export const fetchInterviewSummary = async (
 ): Promise<InterviewSummaryResponse> => {
   const res = await fetch("/api/interview-summary", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: buildHeaders(),
     body: JSON.stringify({
       role,
       companyTier,
       history,
+      userApiKey: getSavedApiKey(),
       userModel: getUserModel(),
     }),
   });
+
   if (!res.ok) {
-    throw new Error("Failed to generate interview summary");
+    await handleFetchError(res, "Failed to generate interview summary");
   }
+
   return await res.json();
 };
 
@@ -215,18 +248,21 @@ export const fetchCoachIntervention = async (
 ): Promise<CoachInterventionResponse> => {
   const res = await fetch("/api/coach-intervene", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: buildHeaders(),
     body: JSON.stringify({
       triggerReason,
       recentTranscript,
       fillerCount,
       wpm,
+      userApiKey: getSavedApiKey(),
       userModel: getUserModel(),
     }),
   });
+
   if (!res.ok) {
-    throw new Error("Failed to generate coach intervention");
+    await handleFetchError(res, "Failed to generate coach intervention");
   }
+
   return await res.json();
 };
 
@@ -249,17 +285,19 @@ export const fetchScriptDoctor = async (
 ): Promise<ScriptDoctorResponse> => {
   const res = await fetch("/api/script-doctor", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: buildHeaders(),
     body: JSON.stringify({
       rawScript,
       targetAudience,
+      userApiKey: getSavedApiKey(),
       userModel: getUserModel(),
     }),
   });
+
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Script doctor request failed' }));
-    throw new Error(err.error || 'Failed script doctor optimization');
+    await handleFetchError(res, "Failed script doctor optimization");
   }
+
   return await res.json();
 };
 
@@ -281,27 +319,19 @@ export interface RealtimeFeedbackResponse {
 export const getRealtimeFeedback = async (
   metrics: RealtimeFeedbackRequest
 ): Promise<RealtimeFeedbackResponse> => {
-  try {
-    const res = await fetch("/api/realtime-feedback", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...metrics,
-        userModel: getUserModel(),
-      }),
-    });
+  const res = await fetch("/api/realtime-feedback", {
+    method: "POST",
+    headers: buildHeaders(),
+    body: JSON.stringify({
+      ...metrics,
+      userApiKey: getSavedApiKey(),
+      userModel: getUserModel(),
+    }),
+  });
 
-    if (!res.ok) {
-      throw new Error("Realtime feedback endpoint error");
-    }
-
-    return await res.json();
-  } catch (err) {
-    console.error("Realtime feedback request error:", err);
-    return {
-      suggestion: "Maintain steady eye contact and articulate clearly.",
-      category: "tone",
-      statusColor: "green",
-    };
+  if (!res.ok) {
+    await handleFetchError(res, "Realtime feedback failed");
   }
+
+  return await res.json();
 };
